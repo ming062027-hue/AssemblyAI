@@ -35,6 +35,15 @@ export function createInitialSessionUpdate() {
   return buildSessionUpdate(PROMPT_S0, TOOLS_S0);
 }
 
+// S1（機台確認後）只送「對話中能改」的欄位：system_prompt、tools。
+// output.voice／input.voice_focus／input.language_codes 在第一次 session.update 後不可變，
+// 再送整包會被真 API 回 immutable_field（2026-09-19 Claude 用真 API 實測）。
 export function createConfirmedSessionUpdate() {
-  return buildSessionUpdate(PROMPT_S1, TOOLS_S1);
+  return {
+    type: "session.update",
+    session: {
+      system_prompt: PROMPT_S1,
+      tools: TOOLS_S1,
+    },
+  };
 }
