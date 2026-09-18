@@ -1,10 +1,10 @@
-# Shop-Floor Voice Assistant (working title)
+# VoiceAndon
 
 A voice assistant for noisy CNC machine shops, built for the lablab.ai × AssemblyAI Voice Agent Hackathon (September 2026).
 
 Operators talk to it right next to a loud machine. They can ask what an alarm means, hear the first checks to try, and open a repair ticket once they have confirmed the details. Supervisors see new tickets on a live dashboard.
 
-> **Status:** early skeleton (v0.1). The voice features are under construction.
+> **Status (v0.1):** the demo main line is implemented and validated against the AssemblyAI Voice Agent API — an operator speaks, the assistant looks up machine status and alarm codes, and files a repair ticket after the operator confirms, and supervisors see it on a live board. The in-browser microphone capture and audio playback still need an on-device test.
 
 ## Demo data
 
@@ -39,7 +39,7 @@ Some of these folders are planned and appear as the build progresses.
 | `src/app/operator/` | Operator voice page (in progress) |
 | `src/app/api/voice-token/` | Server route that issues short-lived AssemblyAI tokens (in progress) |
 | `src/voice/` | Voice agent client: audio, WebSocket session, prompts, tool schemas |
-| `public/voice/` | Static audio worklet files used by the voice client |
+| `public/voice/` | Reserved (currently empty): the audio worklet is embedded inline in `src/voice/audio.ts`, not served as a static file |
 | `src/tools/` | Tool handlers that read the demo data and create tickets |
 | `src/data/` | Fictional demo data |
 | `src/board/` | Dashboard components and ticket sync |
