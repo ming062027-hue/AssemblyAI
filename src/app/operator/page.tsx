@@ -1,9 +1,10 @@
 "use client";
 
-// 語音線：操作員語音頁（靜態版，未連線實測）
-// 第二輪派工：按鈕、狀態顯示、session.end 接 mock，不連線；V1 密語位先留。
-// 真連線時把 mock 換成：拿 /api/voice-token 的 token → wss → session.update（inline 設定）。
-// 規格見交接/線_語音.md 步驟 4。
+// 語音線：操作員語音頁（靜態版，未連線實測；V1 密語門：按開始前先過伺服器檢查）
+// 按開始 → 先打 /api/voice-token 只驗密語（只看狀態碼，不讀 token、不開 WebSocket）。
+// 密語錯顯示英文提示；通過才走 mock 事件。真連線時把 mock 換成：
+// 拿 token → wss → session.update（inline 設定）。
+// 規格見方案/完整規格書_v1_2026-09-17.md §4.5、交接/線_語音.md 步驟 4。
 
 import { useEffect, useRef, useState } from "react";
 
@@ -18,6 +19,8 @@ const STATUS_TEXT: Record<Status, string> = {
 export default function OperatorPage() {
   const [status, setStatus] = useState<Status>("idle");
   const [passcode, setPasscode] = useState("");
+  const [passcodeError, setPasscodeError] = useState("");
+  const [checking, setChecking] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [log, setLog] = useState<string[]>([]);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -32,8 +35,41 @@ export default function OperatorPage() {
     setLog((prev) => [...prev.slice(-19), line]);
   }
 
-  function startCall() {
-    // 靜態版：不拿 token、不開 WebSocket，只走一遍事件形狀。
+  async function startCall() {
+    // V1 密語門：先請伺服器驗密語。只看狀態碼，不讀 token、不開 WebSocket。
+    if (!passcode) {
+      setPasscodeError("Please enter the demo passcode first.");
+      return;
+    }
+    setChecking(true);
+    setPasscodeError("");
+    let res: Response;
+    try {
+      res = await fetch(
+        "/api/voice-token?passcode=" + encodeURIComponent(passcode),
+        { cache: "no-store" },
+      );
+    } catch {
+      setPasscodeError(
+        "Could not reach the token server. Is the dev server running?",
+      );
+      setChecking(false);
+      return;
+    }
+    setChecking(false);
+    if (res.status === 401) {
+      setPasscodeError("Wrong passcode. Please try again.");
+      return;
+    }
+    if (res.status === 500) {
+      setPasscodeError("Demo passcode is not configured on the server.");
+      return;
+    }
+    if (res.status === 403) {
+      setPasscodeError("Request blocked. Please open this page directly.");
+      return;
+    }
+    // 靜態版：密語通過（或開發模式沒設密語）後，只走一遍 mock 事件形狀。
     setStatus("live");
     setSeconds(0);
     push("up: session.update (mock, inline config, no connection)");
@@ -84,25 +120,37 @@ export default function OperatorPage() {
 
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-black/70 dark:text-white/70">
-            Demo passcode (reserved for V1 protection, not checked in static
-            version)
+            Demo passcode (required, checked by the server before starting)
           </span>
           <input
             value={passcode}
-            onChange={(e) => setPasscode(e.target.value)}
+            onChange={(e) => {
+              setPasscode(e.target.value);
+              setPasscodeError("");
+            }}
             placeholder="passcode"
             autoComplete="off"
             className="rounded-lg border border-black/10 bg-transparent px-3 py-2 dark:border-white/15"
           />
+          {passcodeError ? (
+            <span className="text-sm text-red-600 dark:text-red-400">
+              {passcodeError}
+            </span>
+          ) : null}
         </label>
 
         <div className="flex flex-wrap gap-2">
           {status === "idle" || status === "ended" ? (
             <button
               onClick={status === "ended" ? reset : startCall}
+              disabled={checking}
               className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
             >
-              {status === "ended" ? "Start again" : "Start call (mock)"}
+              {checking
+                ? "Checking passcode..."
+                : status === "ended"
+                  ? "Start again"
+                  : "Start call (mock)"}
             </button>
           ) : (
             <button
