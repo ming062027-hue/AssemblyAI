@@ -14,16 +14,18 @@ function buildSessionUpdate(systemPrompt: string, tools: object[]) {
           "M01", "M02", "M03", "M04", "M05",
           "414", "1001",
           "spindle", "coolant", "ATC", "servo"
-        ]
+        ],
+        // turn_detection 必須放在 input 裡（2026-09-19 Claude 用真 API 實測：
+        // 放在 session 底層會被打回 invalid_format；放進 input 後 session.ready 通過）。
+        turn_detection: {
+          vad_threshold: 0.5,
+          min_silence: 1400,
+          max_silence: 4000,
+          interrupt_response: true
+        }
       },
       output: {
         voice: "alba"
-      },
-      turn_detection: {
-        vad_threshold: 0.5,
-        min_silence: 1400,
-        max_silence: 4000,
-        interrupt_response: true
       }
     }
   };
