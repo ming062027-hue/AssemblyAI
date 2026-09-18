@@ -1,18 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import LiveBoard from "@/board/LiveBoard";
 
 export const metadata: Metadata = {
   title: "Supervisor dashboard",
 };
-
-const columns = [
-  "Ticket",
-  "Machine",
-  "Symptom",
-  "Severity",
-  "Can keep running",
-  "Opened",
-] as const;
 
 export default function DashboardPage() {
   return (
@@ -32,29 +24,7 @@ export default function DashboardPage() {
         </p>
       </header>
 
-      <div className="overflow-x-auto rounded-xl border border-black/10 dark:border-white/15">
-        <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="bg-black/5 dark:bg-white/10">
-            <tr>
-              {columns.map((column) => (
-                <th key={column} scope="col" className="px-4 py-3 font-medium">
-                  {column}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td
-                colSpan={columns.length}
-                className="px-4 py-10 text-center text-black/60 dark:text-white/60"
-              >
-                No open tickets yet.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <LiveBoard />
     </main>
   );
 }
