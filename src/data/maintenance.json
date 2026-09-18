@@ -1,0 +1,92 @@
+[
+  {
+    "machine_id": "M01",
+    "date": "2026-09-10",
+    "item": "Replaced coolant filter screen",
+    "technician": "Ah Cheng"
+  },
+  {
+    "machine_id": "M01",
+    "date": "2026-08-28",
+    "item": "Checked spindle belt tension",
+    "technician": "Mei Ling"
+  },
+  {
+    "machine_id": "M01",
+    "date": "2026-08-12",
+    "item": "Cleaned chip conveyor cover",
+    "technician": "Ah Cheng"
+  },
+  {
+    "machine_id": "M02",
+    "date": "2026-09-08",
+    "item": "Topped up hydraulic oil",
+    "technician": "Da Wei"
+  },
+  {
+    "machine_id": "M02",
+    "date": "2026-08-25",
+    "item": "Tightened door latch screws",
+    "technician": "Mei Ling"
+  },
+  {
+    "machine_id": "M02",
+    "date": "2026-08-09",
+    "item": "Replaced air hose coupling",
+    "technician": "Da Wei"
+  },
+  {
+    "machine_id": "M03",
+    "date": "2026-09-12",
+    "item": "Swapped worn cutting tool set",
+    "technician": "Mei Ling"
+  },
+  {
+    "machine_id": "M03",
+    "date": "2026-08-30",
+    "item": "Checked spindle lubrication oil level",
+    "technician": "Ah Cheng"
+  },
+  {
+    "machine_id": "M03",
+    "date": "2026-08-15",
+    "item": "Cleaned cabinet fan filter",
+    "technician": "Da Wei"
+  },
+  {
+    "machine_id": "M04",
+    "date": "2026-09-05",
+    "item": "Replaced servo drive fuse",
+    "technician": "Da Wei"
+  },
+  {
+    "machine_id": "M04",
+    "date": "2026-08-22",
+    "item": "Inspected axis rails for damage",
+    "technician": "Mei Ling"
+  },
+  {
+    "machine_id": "M04",
+    "date": "2026-08-06",
+    "item": "Drained and refilled coolant tank",
+    "technician": "Ah Cheng"
+  },
+  {
+    "machine_id": "M05",
+    "date": "2026-09-11",
+    "item": "Calibrated tool changer pocket sensor",
+    "technician": "Ah Cheng"
+  },
+  {
+    "machine_id": "M05",
+    "date": "2026-08-27",
+    "item": "Refilled central lubrication tank",
+    "technician": "Mei Ling"
+  },
+  {
+    "machine_id": "M05",
+    "date": "2026-08-11",
+    "item": "Checked shop air pressure regulator",
+    "technician": "Da Wei"
+  }
+]

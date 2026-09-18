@@ -1,0 +1,42 @@
+[
+  {
+    "id": "M01",
+    "name": "DEMO-VMC-01",
+    "location": "Bay A - Row 1",
+    "status": "running",
+    "current_alarm": null,
+    "material_left": 82
+  },
+  {
+    "id": "M02",
+    "name": "DEMO-VMC-02",
+    "location": "Bay A - Row 2",
+    "status": "running",
+    "current_alarm": null,
+    "material_left": 45
+  },
+  {
+    "id": "M03",
+    "name": "DEMO-VMC-03",
+    "location": "Bay B - Row 1",
+    "status": "alarm",
+    "current_alarm": "414",
+    "material_left": 30
+  },
+  {
+    "id": "M04",
+    "name": "DEMO-VMC-04",
+    "location": "Bay B - Row 2",
+    "status": "stopped",
+    "current_alarm": null,
+    "material_left": 0
+  },
+  {
+    "id": "M05",
+    "name": "DEMO-VMC-05",
+    "location": "Bay C - Row 1",
+    "status": "running",
+    "current_alarm": null,
+    "material_left": 67
+  }
+]

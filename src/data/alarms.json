@@ -1,0 +1,122 @@
+[
+  {
+    "code": "101",
+    "title": "Coolant flow low (demo)",
+    "likely_causes": "The coolant tank may be running low after a long shift. The filter screen could also be partly blocked by chips.",
+    "first_checks": [
+      "Check the coolant tank level gauge and top up only if it is below the marked line.",
+      "Look at the filter screen near the pump and clear away any visible chips.",
+      "Restart the coolant pump and watch the flow meter for one minute."
+    ],
+    "severity": "low",
+    "needs_technician": false
+  },
+  {
+    "code": "207",
+    "title": "Chip conveyor jam (demo)",
+    "likely_causes": "Long stringy chips can tangle around the conveyor belt. Running dry cuts for too long makes the pile-up worse.",
+    "first_checks": [
+      "Stop the conveyor from the panel and switch the machine to a safe hold.",
+      "Open the conveyor cover and pull out the tangled chips with the shop hook.",
+      "Jog the conveyor forward briefly to confirm it moves freely, then close the cover."
+    ],
+    "severity": "medium",
+    "needs_technician": false
+  },
+  {
+    "code": "233",
+    "title": "Shop air pressure low (demo)",
+    "likely_causes": "Another machine on the same air line may be using air at the same time. A loose hose coupling can also leak air slowly.",
+    "first_checks": [
+      "Read the air gauge on the machine and note the number.",
+      "Walk along the yellow air hose and listen for hissing at each coupling.",
+      "Tighten any loose coupling by hand and check whether the gauge climbs back."
+    ],
+    "severity": "medium",
+    "needs_technician": false
+  },
+  {
+    "code": "312",
+    "title": "Door interlock open (demo)",
+    "likely_causes": "The front door was not pushed fully shut before the cycle started. The door sensor may also have chips stuck on it.",
+    "first_checks": [
+      "Push the front door firmly until the latch clicks.",
+      "Wipe the small sensor block on the door frame with a dry cloth.",
+      "Press the reset button and confirm the door lamp turns green."
+    ],
+    "severity": "low",
+    "needs_technician": false
+  },
+  {
+    "code": "330",
+    "title": "Cabinet temperature high (demo)",
+    "likely_causes": "The cabinet fan filter gets dusty and slows the airflow. Hot weather plus back-to-back jobs can push the temperature up further.",
+    "first_checks": [
+      "Read the cabinet thermometer and write down the number.",
+      "Pull out the fan filter and shake the dust off outside the cabinet.",
+      "Leave the cabinet door closed, wait ten minutes, and check the reading again."
+    ],
+    "severity": "medium",
+    "needs_technician": false
+  },
+  {
+    "code": "414",
+    "title": "Spindle load abnormal (demo)",
+    "likely_causes": "The cutting tool may be worn after many parts. The speed and feed for this cut could also be set heavier than the tool can take. Low spindle lubrication oil makes the load climb as well.",
+    "first_checks": [
+      "Stop the machine, then look at the tool edge for chipping or heavy wear.",
+      "Compare the speed and feed on the screen with the setting sheet for this job.",
+      "Check the spindle lubrication oil sight glass and note the level."
+    ],
+    "severity": "medium",
+    "needs_technician": false
+  },
+  {
+    "code": "418",
+    "title": "Servo axis overload (demo)",
+    "likely_causes": "The axis may have hit a hard stop or a clamp left in the travel path. A worn ball screw can also raise the drive load over time.",
+    "first_checks": [
+      "Stop the program and switch the machine to manual mode.",
+      "Look along the axis rails for anything blocking the travel, and remove it only if it is safe to reach.",
+      "Call the maintenance technician and report the axis name shown on the screen."
+    ],
+    "severity": "high",
+    "needs_technician": true
+  },
+  {
+    "code": "521",
+    "title": "Hydraulic pressure low (demo)",
+    "likely_causes": "The hydraulic oil level may have dropped below the pump inlet. An old hose can also seep oil at its fittings.",
+    "first_checks": [
+      "Read the hydraulic pressure gauge and write down the number.",
+      "Look under the hydraulic unit for fresh oil spots without touching hot parts.",
+      "Call the maintenance technician and report the gauge reading."
+    ],
+    "severity": "high",
+    "needs_technician": true
+  },
+  {
+    "code": "610",
+    "title": "Lubrication tank low (demo)",
+    "likely_causes": "The central lubrication tank is near empty after weeks of normal use. The low-level float switch trips early on purpose as a reminder.",
+    "first_checks": [
+      "Read the oil level on the side of the lubrication tank.",
+      "Refill with the oil grade printed on the tank label, up to the full line.",
+      "Press the reset button and confirm the warning lamp goes out."
+    ],
+    "severity": "low",
+    "needs_technician": false
+  },
+  {
+    "code": "725",
+    "title": "Tool changer position error (demo)",
+    "likely_causes": "The tool arm may have stopped halfway because a tool was seated crooked. A sensor on the changer ring can also miss its mark after a bump.",
+    "first_checks": [
+      "Keep hands clear and switch the machine to manual mode.",
+      "Look at the changer window and note which pocket number is shown on the screen.",
+      "Call the maintenance technician and report the pocket number."
+    ],
+    "severity": "high",
+    "needs_technician": true
+  }
+]
