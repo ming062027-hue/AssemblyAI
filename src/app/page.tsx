@@ -4,15 +4,21 @@ import { SITE_DESCRIPTION, SITE_NAME } from "@/config/site";
 const entryPoints = [
   {
     href: "/operator",
-    title: "Operator",
+    title: "Try the demo",
     body: "Talk to the assistant next to the machine: ask what an alarm means, then report a problem.",
-    status: "In progress",
+    status: "Demo",
   },
   {
     href: "/dashboard",
-    title: "Supervisor dashboard",
+    title: "Supervisor board",
     body: "Repair tickets opened by voice show up here as soon as the operator confirms them.",
-    status: "Skeleton",
+    status: "Live",
+  },
+  {
+    href: "/pitch",
+    title: "Pitch",
+    body: "Why noisy machine shops need a voice assistant: problem, demo and business model.",
+    status: "Coming soon",
   },
 ] as const;
 
@@ -29,7 +35,7 @@ export default function Home() {
         </p>
       </header>
 
-      <ul className="grid gap-4 sm:grid-cols-2">
+      <ul className="grid gap-4 sm:grid-cols-3">
         {entryPoints.map((entry) => (
           <li key={entry.href}>
             <Link
