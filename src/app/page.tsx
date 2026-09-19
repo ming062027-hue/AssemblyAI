@@ -1,15 +1,21 @@
 "use client";
 
-// 看板資料線：首頁＝ app/public/preview-cnc640.html（604 行、大銘定稿）的忠實 JSX 移植。
-// - 文字／版式一字不加一字不減（HEIDENHAIN→CNC-640 的差別為零，該檔本來已是 CNC-640）。
-// - 圖示照原稿用 lucide CDN（next/script 載入），不換文字符號。
-// - onclick 內聯函式改為同名 React 回呼，行為與原稿 <script> 一致（含 alert、訊息自動隱藏、隨機示範句）。
-// - 不接 machines.json／alarms.json、不 POST /api/voice-stream、不加語言下拉與 INTENT 框、不加底部 M01 條與警報對應條。
+// 首頁＝ CNC-640 淺色控制台（大銘定稿）＋ Model宇宙 語音管家（取代原本假語音）。
+// - 五站放大、內容照大銘 2026-09-20 規格（A/B 碼頭、AGV 明細、手臂代號 AE800/AF800…）。
+// - 伺服軸監控＋AI CLOSED-LOOP 兩塊：平常不出現，警報觸發（isAlarm）才跳出。
+// - 右下角 Model宇宙：真的查警報/開單/用講的跳畫面（重用 src/console/commands、src/board）。
+//   Phase 1 用打字/膠囊模擬語音；Phase 2 換成真 AssemblyAI，動作層不動。
 
 import Script from "next/script";
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SITE_VERSION } from "@/config/site";
+import {
+  interpret,
+  PRESET_COMMANDS,
+  emptyContext,
+  type CommandContext,
+} from "@/console/commands";
+import { subscribe, list, type Ticket } from "@/board/ticketStore";
 
 declare global {
   interface Window {
@@ -27,22 +33,37 @@ const TAB_NAMES: Record<ViewKey, string> = {
   f5: "F5 AI 外部通訊錄明細",
 };
 
-const SAMPLE_PHRASES = [
-  "「請 AGV 2 號前往 1 號手臂區補送中碳鋼物料。」",
-  "「Robot station 2 is running out of raw parts, send AGV immediately.」",
-  "「2 號機械手臂卡阻，立刻指派原廠維修。」",
-];
+// 瀏覽器內建語音辨識（webkitSpeechRecognition）沒有內建 TS 型別，這裡給最小型別。
+type SpeechRec = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
 
 export default function Home() {
   const [view, setView] = useState<ViewKey>("f1");
-  const [isAlarm, setIsAlarm] = useState(true);
+  const [isAlarm, setIsAlarm] = useState(false); // 平常無警報，Model宇宙 查到警報才亮
   const [clock, setClock] = useState("13:15:00");
   const [agvMsg, setAgvMsg] = useState<string | null>(null);
   const [supplierMsg, setSupplierMsg] = useState<string | null>(null);
-  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
-  const [speechText, setSpeechText] = useState(SAMPLE_PHRASES[0]);
-  const [voiceStatus, setVoiceStatus] = useState("待命中 (STANDBY)");
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Model宇宙 語音管家
+  const [mvListening, setMvListening] = useState(false);
+  const [mvDraft, setMvDraft] = useState("");
+  const [mvCtx, setMvCtx] = useState<CommandContext>(emptyContext());
+  const [mvReply, setMvReply] = useState(
+    "我是 Model宇宙。說「機台 3 狀態」「查警報 414」「開維修單」「看手臂數據」，我幫你操控畫面。",
+  );
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [voiceOn, setVoiceOn] = useState(true);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const recognitionRef = useRef<SpeechRec | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -50,6 +71,8 @@ export default function Home() {
     }, 1000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => subscribe(setTickets), []);
 
   useEffect(
     () => () => {
@@ -64,11 +87,9 @@ export default function Home() {
 
   useEffect(() => {
     refreshIcons();
-  }, [view, isRecordingVoice, isAlarm, refreshIcons]);
+  }, [view, mvListening, isAlarm, tickets, refreshIcons]);
 
-  const switchTab = useCallback((key: ViewKey) => {
-    setView(key);
-  }, []);
+  const switchTab = useCallback((key: ViewKey) => setView(key), []);
 
   const dispatchAgv = useCallback((id: string, task: string) => {
     setAgvMsg(`[調度完成] ${id} 收到指令：『${task}』。`);
@@ -82,28 +103,88 @@ export default function Home() {
     msgTimer.current = setTimeout(() => setSupplierMsg(null), 4000);
   }, []);
 
-  const resetAlarm = useCallback(() => {
-    if (isAlarm) {
-      setIsAlarm(false);
-      alert("已靜音全廠廣播，並重置系統報警狀態為正常待命。");
-    } else {
-      window.location.reload();
-    }
-  }, [isAlarm]);
+  const resetAlarm = useCallback(() => setIsAlarm(false), []);
 
-  const toggleVoiceRecording = useCallback(() => {
-    if (!isRecordingVoice) {
-      setIsRecordingVoice(true);
-      setVoiceStatus("語音辨識中...");
-      setSpeechText("正在聆聽語音輸入...");
+  // 宇宙開口講話（瀏覽器內建 TTS，免費，優先用中文聲音）。
+  const speak = useCallback(
+    (text: string) => {
+      if (!voiceOn || typeof window === "undefined" || !window.speechSynthesis) return;
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = "zh-TW";
+        u.rate = 1.05;
+        const zh = window.speechSynthesis
+          .getVoices()
+          .find((v) => v.lang.toLowerCase().startsWith("zh"));
+        if (zh) u.voice = zh;
+        window.speechSynthesis.speak(u);
+      } catch {
+        // TTS 失敗不致命
+      }
+    },
+    [voiceOn],
+  );
+
+  const runModelCommand = useCallback(
+    (text: string) => {
+      const t = text.trim();
+      if (!t) return;
+      const res = interpret(t, mvCtx);
+      setMvCtx(res.context);
+      setMvReply(res.response);
+      speak(res.response);
+      if (res.alarm) {
+        setIsAlarm(true);
+        setView("f1"); // 警報 → 讓總覽亮起來（站別 04＋伺服＋CLOSED-LOOP）
+      } else if (res.navigate) {
+        setView(res.navigate);
+      }
+      if (res.ticketId) setTickets(list()); // 同分頁強制刷新看板
+      setMvDraft("");
+      setMvListening(false);
+    },
+    [mvCtx, speak],
+  );
+
+  // 點麥克風：用瀏覽器內建語音辨識（Chrome 免費）真的聽你講中文。
+  const onMic = useCallback(() => {
+    if (mvListening) {
+      recognitionRef.current?.stop();
+      setMvListening(false);
       return;
     }
-    setIsRecordingVoice(false);
-    setVoiceStatus("AI 語意解析完成");
-    const randomText =
-      SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
-    setSpeechText(randomText);
-  }, [isRecordingVoice]);
+    const w = window as unknown as {
+      SpeechRecognition?: new () => SpeechRec;
+      webkitSpeechRecognition?: new () => SpeechRec;
+    };
+    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!Ctor) {
+      setMvReply("這個瀏覽器不支援語音辨識，請用下面的輸入框打字（Chrome 可以用講的）。");
+      inputRef.current?.focus();
+      return;
+    }
+    const rec = new Ctor();
+    rec.lang = "zh-TW";
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      setMvDraft(transcript);
+      runModelCommand(transcript);
+    };
+    rec.onend = () => setMvListening(false);
+    rec.onerror = () => setMvListening(false);
+    recognitionRef.current = rec;
+    setMvListening(true);
+    try {
+      rec.start();
+    } catch {
+      setMvListening(false);
+    }
+  }, [mvListening, runModelCommand]);
+
+  const latestTickets = [...tickets].slice(-5).reverse();
 
   return (
     <main className="min-h-full flex flex-col select-none">
@@ -156,30 +237,9 @@ export default function Home() {
         </div>
       </header>
 
-      <nav className="bg-[#171c24] border-b border-[#12161c] px-4 py-1.5 flex flex-wrap items-center gap-2 text-xs font-mono">
-        <span className="text-slate-400 mr-1">前往（Go to）：</span>
-        <Link
-          href="/operator"
-          className="hh-softkey rounded px-3 py-1 font-bold text-[#202731]"
-        >
-          ▶ Try the Demo（操作員語音試用）
-        </Link>
-        <Link
-          href="/dashboard"
-          className="hh-softkey rounded px-3 py-1 font-bold text-[#202731]"
-        >
-          ■ Supervisor Board（主管看板）
-        </Link>
-        <Link
-          href="/pitch"
-          className="hh-softkey rounded px-3 py-1 font-bold text-[#202731]"
-        >
-          ★ Pitch Deck（投資簡報）
-        </Link>
-      </nav>
-
       <div className="flex-1 flex flex-col lg:flex-row p-4 gap-4 max-w-[1720px] w-full mx-auto">
         <main className="flex-1 space-y-4">
+          {/* ============ F1 流程監控總覽（放大五站 + 警報才出現的面板） ============ */}
           <div className={view === "f1" ? "space-y-4" : "space-y-4 hidden"}>
             <section className="hh-card rounded-lg p-4">
               <div className="flex justify-between items-center pb-2 mb-3 border-b border-[#9aa3b4]">
@@ -189,95 +249,187 @@ export default function Home() {
                 </h2>
                 <span className="text-xs font-mono font-semibold text-slate-600">STATIONS: 5 ACTIVE</span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 font-sans">
-                <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col justify-between">
-                  <div className="flex justify-between text-[11px] font-mono font-bold">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 font-sans">
+                {/* 01 碼頭進貨 */}
+                <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[260px]">
+                  <div className="flex justify-between text-[12px] font-mono font-bold">
                     <span>01 碼頭進貨</span><span className="text-emerald-700">● 正常</span>
                   </div>
-                  <div className="my-3 text-center">
-                    <i data-lucide="truck" className="w-7 h-7 mx-auto text-slate-700 mb-1" />
-                    <div className="text-xs font-bold">卡車到貨卸料</div>
-                    <div className="text-[10px] text-slate-500">批號 #TK-882</div>
+                  <div className="flex-1 flex flex-col gap-2">
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
+                      <div className="text-[11px] font-bold text-[#0056b3] mb-1">A 碼頭進貨</div>
+                      <div className="text-[10px] text-slate-600 leading-relaxed font-mono">
+                        司機 AA｜車牌 BBB-123<br />10:00 碼頭下貨<br />1 號 AGV 來下貨
+                      </div>
+                    </div>
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
+                      <div className="text-[11px] font-bold text-[#0056b3] mb-1">B 碼頭進貨</div>
+                      <div className="text-[10px] text-slate-600 leading-relaxed font-mono">
+                        司機 BB｜車牌 CCC-456<br />15:00 到碼頭<br />2 號 AGV 來下貨
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[10px] p-1.5 rounded bg-slate-100 border text-center font-mono">進貨驗收完成</div>
                 </div>
-                <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col justify-between">
-                  <div className="flex justify-between text-[11px] font-mono font-bold">
-                    <span>02 下料 AGV</span><span className="text-blue-700">● 搬運中</span>
+
+                {/* 02 下貨入庫 AGV */}
+                <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[260px]">
+                  <div className="flex justify-between text-[12px] font-mono font-bold">
+                    <span>02 下貨入庫 AGV</span><span className="text-blue-700">● 搬運中</span>
                   </div>
-                  <div className="my-3 text-center">
-                    <i data-lucide="bot" className="w-7 h-7 mx-auto text-[#0056b3] mb-1" />
-                    <div className="text-xs font-bold">下料入庫登記</div>
-                    <div className="text-[10px] text-slate-500">品名/數量/材質/廠商</div>
+                  <div className="flex-1 flex flex-col gap-2">
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
+                      <div className="text-[11px] font-bold text-[#0056b3] mb-1">1 號 AGV</div>
+                      <div className="text-[10px] text-slate-600 leading-relaxed">
+                        確認司機車牌 · 碼頭<br />品名/數量/材質/供應商<br />
+                        <span className="font-mono font-bold text-slate-800">入庫 A 櫃 2-1</span>
+                      </div>
+                    </div>
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
+                      <div className="text-[11px] font-bold text-[#0056b3] mb-1">2 號 AGV</div>
+                      <div className="text-[10px] text-slate-600 leading-relaxed">
+                        確認司機車牌 · 碼頭<br />品名/數量/材質/供應商<br />
+                        <span className="font-mono font-bold text-slate-800">入庫 B 櫃 1-1</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[10px] p-1.5 rounded bg-slate-100 border text-center font-mono">WMS 自動寫入</div>
                 </div>
-                <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col justify-between">
-                  <div className="flex justify-between text-[11px] font-mono font-bold">
+
+                {/* 03 取料 AGV */}
+                <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[260px]">
+                  <div className="flex justify-between text-[12px] font-mono font-bold">
                     <span>03 取料 AGV</span><span className="text-amber-700">● 待命中</span>
                   </div>
-                  <div className="my-3 text-center">
-                    <i data-lucide="package-search" className="w-7 h-7 mx-auto text-amber-700 mb-1" />
-                    <div className="text-xs font-bold">補料出庫調度</div>
-                    <div className="text-[10px] text-slate-500">支援語音/缺料觸發</div>
-                  </div>
-                  <div className="text-[10px] p-1.5 rounded bg-slate-100 border text-center font-mono">排程調度中</div>
-                </div>
-                <div className="p-3 rounded flex flex-col justify-between bg-rose-50 border-2 border-rose-600 shadow-sm">
-                  <div className="flex justify-between text-[11px] font-mono font-bold text-rose-800">
-                    <span>04 手臂加工區</span><span className="animate-pulse font-black">● 警報</span>
-                  </div>
-                  <div className="my-3 text-center">
-                    <i data-lucide="alert-triangle" className="w-7 h-7 mx-auto text-rose-600 mb-1" />
-                    <div className="text-xs font-black text-rose-900">2號手臂：E-402</div>
-                    <div className="text-[10px] text-rose-700">物料區 → 自檢 → 成品區</div>
-                  </div>
-                  <div className="text-[10px] p-1.5 rounded bg-rose-100 border border-rose-300 text-center font-mono font-bold text-rose-900">
-                    J2 伺服過載 142%
+                  <div className="flex-1 flex flex-col gap-2">
+                    <div className="p-2 rounded bg-amber-50 border border-amber-300 flex-1">
+                      <div className="text-[11px] font-bold text-amber-800 mb-1">1 號手臂物料區</div>
+                      <div className="text-[10px] text-slate-700 leading-relaxed">
+                        <span className="text-rose-700 font-bold">低於下限 · 補貨</span><br />
+                        鋁鋼｜100 支｜S45C<br />
+                        <span className="font-mono font-bold text-slate-800">B 櫃 1-1</span>
+                      </div>
+                    </div>
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
+                      <div className="text-[11px] font-bold text-[#0056b3] mb-1">2 號手臂物料區</div>
+                      <div className="text-[10px] text-emerald-700 font-bold leading-relaxed">
+                        原料正常<br />待命中
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col justify-between">
-                  <div className="flex justify-between text-[11px] font-mono font-bold">
-                    <span>05 品檢入庫</span><span className="text-emerald-700">● 正常</span>
+
+                {/* 04 加工區（正常 / 警報） */}
+                <div className={`p-3 rounded flex flex-col gap-2 min-h-[260px] ${isAlarm ? "bg-rose-50 border-2 border-rose-600 shadow-sm" : "bg-white/70 border border-[#9aa3b4]"}`}>
+                  <div className={`flex justify-between text-[12px] font-mono font-bold ${isAlarm ? "text-rose-800" : ""}`}>
+                    <span>04 加工區</span>
+                    <span className={isAlarm ? "text-rose-700 animate-pulse font-black" : "text-emerald-700"}>
+                      ● {isAlarm ? "警報" : "正常"}
+                    </span>
                   </div>
-                  <div className="my-3 text-center">
-                    <i data-lucide="check-check" className="w-7 h-7 mx-auto text-emerald-700 mb-1" />
-                    <div className="text-xs font-bold">視覺品檢自檢</div>
-                    <div className="text-[10px] text-slate-500">良率 99.4%</div>
+                  <div className="flex-1 flex flex-col gap-2">
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
+                      <div className="text-[11px] font-bold text-[#0056b3] mb-1">1 號機械手臂 · AE800</div>
+                      <div className="text-[10px] text-slate-600 leading-relaxed">物料區 › 自檢成品 › 成品區</div>
+                    </div>
+                    <div className={`p-2 rounded border flex-1 ${isAlarm ? "bg-rose-100 border-rose-300" : "bg-slate-50 border-slate-200"}`}>
+                      <div className={`text-[11px] font-bold mb-1 ${isAlarm ? "text-rose-900" : "text-[#0056b3]"}`}>
+                        2 號機械手臂 · AF800{isAlarm ? "：E-402" : ""}
+                      </div>
+                      <div className={`text-[10px] leading-relaxed ${isAlarm ? "text-rose-700 font-bold" : "text-slate-600"}`}>
+                        {isAlarm ? "J2 伺服過載 142%" : "物料區 › 自檢成品 › 成品區"}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[10px] p-1.5 rounded bg-slate-100 border text-center font-mono">自動入庫立體倉</div>
+                </div>
+
+                {/* 05 品檢入庫 AGV */}
+                <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[260px]">
+                  <div className="flex justify-between text-[12px] font-mono font-bold">
+                    <span>05 品檢入庫 AGV</span><span className="text-emerald-700">● 正常</span>
+                  </div>
+                  <div className="flex-1 flex flex-col gap-2">
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
+                      <div className="text-[11px] font-bold text-[#0056b3] mb-1">3 號 AGV · 1 號手臂</div>
+                      <div className="text-[10px] text-slate-600 leading-relaxed">成品區搬運 › 品檢區</div>
+                    </div>
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
+                      <div className="text-[11px] font-bold text-[#0056b3] mb-1">4 號 AGV · 2 號手臂</div>
+                      <div className="text-[10px] text-slate-600 leading-relaxed">成品區搬運 › 品檢區</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <section className="hh-card rounded-lg p-4 font-mono text-xs space-y-2">
-                <div className="font-bold border-b border-[#9aa3b4] pb-1 flex justify-between">
-                  <span>伺服軸即時監控 (ROBOT-02)</span>
-                  <span className="text-rose-600 font-bold">E-402 警報中</span>
+
+            {/* 語音開單即時看板（Model宇宙 開的單） */}
+            <section className="hh-card rounded-lg p-4">
+              <div className="flex justify-between items-center pb-2 mb-2 border-b border-[#9aa3b4]">
+                <h2 className="text-sm font-bold text-[#202731] flex items-center gap-2">
+                  <i data-lucide="clipboard-list" className="w-4 h-4 text-[#0056b3]" />
+                  語音開單即時看板
+                </h2>
+                <span className="text-xs font-mono font-semibold text-slate-600">{tickets.length} 張單</span>
+              </div>
+              {latestTickets.length === 0 ? (
+                <div className="text-center text-slate-500 text-xs py-3 font-mono">
+                  等待語音開單…　跟 Model宇宙 說「開維修單」試試
                 </div>
-                <div className="flex justify-between p-1.5 bg-white rounded border"><span>J1 BASE:</span><span>+124.500 mm (32%)</span></div>
-                <div className="flex justify-between p-1.5 bg-rose-100 rounded border border-rose-400 font-bold text-rose-900">
-                  <span>J2 SHOULDER:</span><span>-48.210 mm (142% 超載)</span>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-100 border-b font-mono text-slate-600">
+                      <tr>
+                        <th className="p-2">工單</th><th className="p-2">機台</th><th className="p-2">症狀</th><th className="p-2">嚴重度</th><th className="p-2">時間</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {latestTickets.map((t) => (
+                        <tr key={t.ticket_id}>
+                          <td className="p-2 font-mono font-bold text-[#0056b3]">{t.ticket_id}</td>
+                          <td className="p-2 font-mono">{t.machine_id}</td>
+                          <td className="p-2">{t.symptom}</td>
+                          <td className="p-2 text-amber-700 font-bold">{t.severity}</td>
+                          <td className="p-2 font-mono text-slate-500">{new Date(t.created_at).toLocaleTimeString("zh-TW", { hour12: false })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="flex justify-between p-1.5 bg-white rounded border"><span>J3 ELBOW:</span><span>+982.015 mm (28%)</span></div>
-              </section>
-              <section className="hh-card rounded-lg p-4 text-xs font-sans space-y-2">
-                <div className="font-bold border-b border-[#9aa3b4] pb-1 flex justify-between">
-                  <span>AI 大腦最新自主行動摘要</span>
-                  <span className="text-emerald-700 font-mono font-bold">CLOSED-LOOP</span>
-                </div>
-                <div className="p-2 bg-white rounded border border-slate-300">
-                  <div className="text-rose-700 font-bold text-[11px]">● 已致電原廠報修 (13:10:15)</div>
-                  <div className="text-[11px] text-slate-700 mt-0.5">預約工程師今日 15:00 到廠排查 J2 軸卡料。</div>
-                </div>
-                <div className="p-2 bg-white rounded border border-slate-300">
-                  <div className="text-amber-800 font-bold text-[11px]">● 已致電材料供應商 (12:45:00)</div>
-                  <div className="text-[11px] text-slate-700 mt-0.5">S45C 鋼材庫存偏低，自動叫料 200 支，明日 09:00 前送達。</div>
-                </div>
-              </section>
-            </div>
+              )}
+            </section>
+
+            {/* 警報才出現：伺服軸監控 ＋ AI CLOSED-LOOP */}
+            {isAlarm && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <section className="hh-card rounded-lg p-4 font-mono text-xs space-y-2">
+                  <div className="font-bold border-b border-[#9aa3b4] pb-1 flex justify-between">
+                    <span>伺服軸即時監控 (ROBOT-02)</span>
+                    <span className="text-rose-600 font-bold">E-402 警報中</span>
+                  </div>
+                  <div className="flex justify-between p-1.5 bg-white rounded border"><span>J1 BASE:</span><span>+124.500 mm (32%)</span></div>
+                  <div className="flex justify-between p-1.5 bg-rose-100 rounded border border-rose-400 font-bold text-rose-900">
+                    <span>J2 SHOULDER:</span><span>-48.210 mm (142% 超載)</span>
+                  </div>
+                  <div className="flex justify-between p-1.5 bg-white rounded border"><span>J3 ELBOW:</span><span>+982.015 mm (28%)</span></div>
+                </section>
+                <section className="hh-card rounded-lg p-4 text-xs font-sans space-y-2">
+                  <div className="font-bold border-b border-[#9aa3b4] pb-1 flex justify-between">
+                    <span>AI 大腦最新自主行動摘要</span>
+                    <span className="text-emerald-700 font-mono font-bold">CLOSED-LOOP</span>
+                  </div>
+                  <div className="p-2 bg-white rounded border border-slate-300">
+                    <div className="text-rose-700 font-bold text-[11px]">● 已致電原廠報修 (13:10:15)</div>
+                    <div className="text-[11px] text-slate-700 mt-0.5">預約工程師今日 15:00 到廠排查 J2 軸卡料。</div>
+                  </div>
+                  <div className="p-2 bg-white rounded border border-slate-300">
+                    <div className="text-amber-800 font-bold text-[11px]">● 已致電材料供應商 (12:45:00)</div>
+                    <div className="text-[11px] text-slate-700 mt-0.5">S45C 鋼材庫存偏低，自動叫料 200 支，明日 09:00 前送達。</div>
+                  </div>
+                </section>
+              </div>
+            )}
           </div>
 
+          {/* ============ F2 AGV（原樣） ============ */}
           <div className={view === "f2" ? "hh-card rounded-lg p-5 space-y-4" : "hidden hh-card rounded-lg p-5 space-y-4"}>
             <div className="flex justify-between items-center border-b border-[#9aa3b4] pb-2">
               <h2 className="text-base font-bold text-[#202731] flex items-center gap-2">
@@ -344,6 +496,7 @@ export default function Home() {
             </div>
           </div>
 
+          {/* ============ F3 手臂數據（原樣） ============ */}
           <div className={view === "f3" ? "hh-card rounded-lg p-5 space-y-4" : "hidden hh-card rounded-lg p-5 space-y-4"}>
             <div className="flex justify-between items-center border-b border-[#9aa3b4] pb-2">
               <h2 className="text-base font-bold text-[#202731] flex items-center gap-2">
@@ -439,6 +592,7 @@ export default function Home() {
             </div>
           </div>
 
+          {/* ============ F4 原料庫存（原樣） ============ */}
           <div className={view === "f4" ? "hh-card rounded-lg p-5 space-y-4" : "hidden hh-card rounded-lg p-5 space-y-4"}>
             <div className="flex justify-between items-center border-b border-[#9aa3b4] pb-2">
               <h2 className="text-base font-bold text-[#202731] flex items-center gap-2">
@@ -513,6 +667,7 @@ export default function Home() {
             </div>
           </div>
 
+          {/* ============ F5 AI 通話紀錄（原樣） ============ */}
           <div className={view === "f5" ? "hh-card rounded-lg p-5 space-y-4" : "hidden hh-card rounded-lg p-5 space-y-4"}>
             <div className="flex justify-between items-center border-b border-[#9aa3b4] pb-2">
               <h2 className="text-base font-bold text-[#202731] flex items-center gap-2">
@@ -548,6 +703,7 @@ export default function Home() {
           </div>
         </main>
 
+        {/* ============ 右側：F1–F6 軟鍵 ＋ Model宇宙 語音管家 ============ */}
         <aside className="w-full lg:w-72 flex flex-col gap-3">
           <div className="flex flex-col gap-2">
             <button type="button" onClick={() => switchTab("f1")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === "f1" ? " active" : ""}`}>
@@ -575,34 +731,72 @@ export default function Home() {
               <i data-lucide="bell-off" className="w-4 h-4 text-rose-200" />
             </button>
           </div>
-          <div className="hh-card rounded-lg p-3 text-center flex flex-col items-center mt-auto border-2 border-slate-400">
+
+          {/* Model宇宙 語音管家 */}
+          <div className="hh-card rounded-lg p-3 flex flex-col mt-auto border-2 border-slate-400">
             <div className="w-full text-left pb-1 mb-1 border-b border-[#9aa3b4] flex justify-between items-center">
               <span className="text-xs font-bold text-[#202731] flex items-center gap-1">
-                <i data-lucide="mic" className="w-3.5 h-3.5 text-[#0056b3]" /> 語音調度
+                <i data-lucide="mic" className="w-3.5 h-3.5 text-[#0056b3]" />
+                MODEL宇宙 語音管家
               </span>
-              <div className={isRecordingVoice ? "flex items-center gap-1" : "hidden items-center gap-1"}>
-                <span className="wave-bar" /><span className="wave-bar" /><span className="wave-bar" /><span className="wave-bar" />
+              <div className="flex items-center gap-1.5">
+                <div className={mvListening ? "flex items-center gap-1" : "hidden items-center gap-1"}>
+                  <span className="wave-bar" /><span className="wave-bar" /><span className="wave-bar" /><span className="wave-bar" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVoiceOn((v) => !v)}
+                  title="開關宇宙的語音回覆"
+                  className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-slate-300 hover:bg-slate-100"
+                >
+                  {voiceOn ? "🔊 語音開" : "🔇 語音關"}
+                </button>
               </div>
             </div>
             <button
               type="button"
-              onClick={toggleVoiceRecording}
-              aria-pressed={isRecordingVoice}
-              className={`w-20 h-20 my-2 rounded-full hh-softkey flex flex-col items-center justify-center border-2 border-[#596579] active:scale-95 shadow-md transition${isRecordingVoice ? " border-rose-500 bg-rose-100" : ""}`}
+              onClick={onMic}
+              aria-pressed={mvListening}
+              className={`w-16 h-16 mx-auto my-1.5 rounded-full hh-softkey flex flex-col items-center justify-center border-2 border-[#596579] active:scale-95 shadow-md transition${mvListening ? " border-rose-500 bg-rose-100" : ""}`}
             >
-              <i data-lucide="mic" className={`w-7 h-7 ${isRecordingVoice ? "text-rose-600" : "text-[#0056b3]"}`} />
-              <span className={`text-[10px] font-bold mt-1 ${isRecordingVoice ? "text-rose-800" : "text-slate-800"}`}>
-                {isRecordingVoice ? "停止辨識" : "點擊說話"}
+              <i data-lucide="mic" className={`w-6 h-6 ${mvListening ? "text-rose-600" : "text-[#0056b3]"}`} />
+              <span className={`text-[9px] font-bold mt-0.5 ${mvListening ? "text-rose-800" : "text-slate-800"}`}>
+                {mvListening ? "聆聽中" : "點擊說話"}
               </span>
             </button>
-            <div className={`text-[11px] font-mono font-bold ${isRecordingVoice ? "text-rose-600 animate-pulse" : voiceStatus === "AI 語意解析完成" ? "text-emerald-700" : "text-slate-600"}`}>
-              {voiceStatus}
+            <div className="w-full p-2 bg-white rounded border border-slate-400 text-[11px] font-sans text-slate-800 leading-snug min-h-[52px]">
+              {mvReply}
             </div>
-            <div className="w-full mt-2 text-left">
-              <div className="text-[10px] font-mono text-slate-500 mb-0.5">剛剛說話內容紀錄 (TRANSCRIPT)：</div>
-              <div className="w-full min-h-[48px] p-2 bg-white rounded border border-slate-400 text-xs font-sans text-slate-800 leading-snug">
-                {speechText}
-              </div>
+            <form
+              className="mt-2 w-full flex gap-1.5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                runModelCommand(mvDraft);
+              }}
+            >
+              <input
+                ref={inputRef}
+                value={mvDraft}
+                onChange={(e) => setMvDraft(e.target.value)}
+                placeholder="打字，或點上面麥克風用講的"
+                autoComplete="off"
+                className="flex-1 rounded border border-slate-400 bg-white px-2 py-1.5 text-xs text-slate-800"
+              />
+              <button type="submit" className="rounded bg-[#0056b3] hover:bg-blue-700 px-2.5 py-1.5 text-xs font-bold text-white">
+                送
+              </button>
+            </form>
+            <div className="mt-2 w-full flex flex-wrap gap-1">
+              {PRESET_COMMANDS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => runModelCommand(c)}
+                  className="hh-softkey rounded px-2 py-0.5 text-[10px] font-mono text-[#202731]"
+                >
+                  {c}
+                </button>
+              ))}
             </div>
           </div>
         </aside>
