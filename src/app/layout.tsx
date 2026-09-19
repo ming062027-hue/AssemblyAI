@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: SITE_NAME,
+    default: "VoiceAndon Smart Factory Console",
     template: `%s · ${SITE_NAME}`,
   },
   description: SITE_DESCRIPTION,
