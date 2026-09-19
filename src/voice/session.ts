@@ -9,11 +9,8 @@ function buildSessionUpdate(systemPrompt: string, tools: object[]) {
       tools,
       input: {
         voice_focus: "far-field",
-        // 多語：明確列出需要的三種（en/zh/pt），不鎖英文。
-        // 理由：不設 language_codes 是全自動偵測（18 種裡猜，吵雜現場易誤判）；
-        // 設成 ["en","zh","pt"] 只在這三種裡判斷，官方說會稍微準一點
-        //（見 交接/線_語音.md 結論④）。輸出仍只用英文（規格書 §1 #4：尚無中文聲音）。
-        language_codes: ["en", "zh", "pt"],
+        // 照官方 18 種，不設 language_codes 全自動（不傳此欄位，自動在 18 種裡偵測）。
+        // 輸出仍只用英文（規格書 §1 #4：尚無中文聲音）。
         keyterms: [
           "M01", "M02", "M03", "M04", "M05",
           "414", "1001",
