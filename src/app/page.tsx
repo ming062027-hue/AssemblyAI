@@ -1,7 +1,12 @@
 "use client";
 
 // 看板資料線：首頁＝車間控制台風格（自有樣式，不含任何第三方品牌字樣）。
-// - 外觀：冷灰底、高對比、hh-card / hh-softkey、自繪 READY / ALARM 燈、雙分屏＋右側 6 鍵；語音調度（按住說話＋波形＋待命中）置於主排最底下全寬、不在側欄。
+// - 版式（依主控派工單文字描述還原；原始 HTML 全文未收到，見交接檔 13n）：
+//   頂部深色列（VoiceAndon｜Smart Factory Console＋綠色 AUTO RUN｜READY/ALARM＋時間）、
+//   5 站卡（01碼頭–05品檢，紅框標示實際告警站）、左下伺服 J1–J3、右下 AI 摘要 CLOSED-LOOP、
+//   F1–F6 橫排軟鍵、底部 STATUS 列。
+//   語音卡保持固定寬度（不拉全寬），置於主內容最底下置中；右側語音區已移除。
+// - CSS 變數 --hh-bg:#c9d0db、--hh-panel:#dce2ec 照派工單採用；其餘為同色系延伸。
 // - F1–F6 可點、可按鍵盤 F1–F6 真切換；內容只用 src/data 現有 M01–M05 / 警報 / 保養（自編示範資料）。
 //   F2 AGV 4 台可點派車（本機狀態、不控制真車）；F3 J1–J6 負載/溫度每 1.5 秒本機跳動（示意、非感測值）；
 //   F4 S45C 庫存 <50 紅字＋一鍵催料鈕（本機旗標、未連線）；F5 通訊錄明細（虛構技師＋示範單號 #TICKET-8902 / #PO-DEMO-…）；
@@ -54,6 +59,15 @@ const FUNC_KEYS: { key: FuncKey; label: string; hint: string }[] = [
   { key: "F5", label: "Contacts", hint: "tickets / POs" },
   { key: "F6", label: "Mute / Reset", hint: "back to green" },
 ];
+
+// 站號中文名：派工單只給 01碼頭、05品檢，中間三站不猜，用資料 location。
+const STATION_NAMES: Record<string, string> = {
+  M01: "01 · 碼頭",
+  M02: "02",
+  M03: "03",
+  M04: "04",
+  M05: "05 · 品檢",
+};
 
 function lampClass(status: string): string {
   if (status === "alarm") return "hh-lamp hh-lamp-alarm";
@@ -320,16 +334,24 @@ export default function Home() {
   const selectedJobs = selected ? maintenanceRecords.filter((r) => r.machine_id === selected.id).slice(0, 2) : [];
   const lowStations = machines.filter((m) => m.material_left < 50);
   const dispatchedCount = agvs.filter((a) => a.status === "enroute").length;
+  const servoJoints = joints.slice(0, 3);
+  const alarmMachine = machines.find((m) => m.status === "alarm");
+  const voiceState = muted ? "已靜音" : talking ? "錄音中" : "待命中";
 
   return (
     <main className="hh-root">
       <style>{`
-        .hh-root { background: #c9ced4; color: #16191c; min-height: 100%; display: flex; flex-direction: column; }
-        .hh-topbar { background: #23282d; color: #eef1f4; display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 4px solid #0f1113; }
-        .hh-title { font-weight: 700; letter-spacing: 0.02em; font-size: 18px; }
-        .hh-subtitle { font-size: 12px; color: #aeb6bf; }
+        :root {
+          --hh-bg: #c9d0db;
+          --hh-panel: #dce2ec;
+        }
+        .hh-root { background: var(--hh-bg); color: #16191c; min-height: 100%; display: flex; flex-direction: column; }
+        .hh-topbar { background: #23282d; color: #eef1f4; display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 4px solid #0f1113; }
+        .hh-brand { font-weight: 800; letter-spacing: 0.04em; font-size: 20px; white-space: nowrap; }
+        .hh-console { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 700; color: #c7d2dc; }
+        .hh-auto { background: #2fbf5f; color: #06130a; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 4px; border: 2px solid #0b2b16; letter-spacing: 0.06em; }
         .hh-lamps { display: flex; gap: 8px; margin-left: auto; align-items: center; }
-        .hh-lamp { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 2px solid #0f1113; color: #0f1113; background: #8b939c; }
+        .hh-lamp { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 2px solid #0f1113; color: #0f1113; background: #8b939c; white-space: nowrap; }
         .hh-lamp::before { content: ""; width: 10px; height: 10px; border-radius: 999px; background: #4a5158; }
         .hh-lamp-ready { background: #2fbf5f; color: #06130a; }
         .hh-lamp-ready::before { background: #d6ffe2; box-shadow: 0 0 6px #d6ffe2; }
@@ -338,24 +360,32 @@ export default function Home() {
         .hh-lamp-stopped { background: #f5a524; color: #241500; }
         .hh-lamp-stopped::before { background: #fff7e6; }
         @keyframes hh-blink { 50% { filter: brightness(0.75); } }
-        .hh-body { display: grid; grid-template-columns: 1fr 168px; gap: 12px; padding: 12px 16px; flex: 1; }
-        @media (max-width: 760px) { .hh-body { grid-template-columns: 1fr; } }
-        .hh-screen { background: #1b1f23; color: #e8edf1; border: 3px solid #0f1113; border-radius: 8px; padding: 14px; min-height: 420px; }
-        .hh-screen h2 { font-size: 14px; color: #9fb0bd; margin: 0 0 10px; font-weight: 700; letter-spacing: 0.06em; }
-        .hh-card { background: #242a30; border: 1px solid #3a424b; border-radius: 6px; padding: 10px 12px; }
+        .hh-main { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; flex: 1; }
+        .hh-screen { background: var(--hh-panel); color: #16191c; border: 3px solid #0f1113; border-radius: 8px; padding: 14px; box-shadow: 0 2px 0 #0f1113; }
+        .hh-screen-dark { background: #1b1f23; color: #e8edf1; }
+        .hh-screen h2 { font-size: 14px; color: #4c555e; margin: 0 0 10px; font-weight: 700; letter-spacing: 0.06em; }
+        .hh-screen-dark h2 { color: #9fb0bd; }
+        .hh-card { background: #242a30; border: 1px solid #3a424b; border-radius: 6px; padding: 10px 12px; color: #e8edf1; }
+        .hh-card-light { background: #f4f6f9; border: 1px solid #9aa3ad; color: #16191c; }
         .hh-card h3 { margin: 0 0 4px; font-size: 15px; }
         .hh-card-click { cursor: pointer; }
         .hh-card-click[aria-pressed="true"] { border-color: #7CFC9A; box-shadow: 0 0 0 2px #7CFC9A; }
+        .hh-alarm-frame { border: 3px solid #e5484d; box-shadow: 0 0 0 2px #e5484d, 0 0 12px rgba(229,72,77,0.55); }
         .hh-meta { font-size: 12px; color: #aeb9c4; }
+        .hh-card-light .hh-meta { color: #4c555e; }
         .hh-grid5 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+        .hh-midrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        @media (max-width: 760px) { .hh-midrow { grid-template-columns: 1fr; } }
         .hh-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
         .hh-table { width: 100%; border-collapse: collapse; font-size: 13px; }
         .hh-table th, .hh-table td { border: 1px solid #3a424b; padding: 6px 8px; text-align: left; }
         .hh-table th { background: #2b3239; color: #c7d2dc; }
         .hh-low { color: #ff8a8e; font-weight: 800; }
+        .hh-card-light .hh-low { color: #c81e2b; }
         .hh-ok { color: #7CFC9A; font-weight: 800; }
-        .hh-keys { display: flex; flex-direction: column; gap: 10px; }
-        @media (max-width: 760px) { .hh-keys { flex-direction: row; flex-wrap: wrap; } }
+        .hh-card-light .hh-ok { color: #137a3a; }
+        .hh-fkeys { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+        @media (max-width: 760px) { .hh-fkeys { grid-template-columns: repeat(3, 1fr); } }
         .hh-softkey { background: linear-gradient(#f2f4f6, #c3c9d0); border: 2px solid #0f1113; border-bottom-width: 5px; border-radius: 8px; padding: 10px 8px; text-align: left; cursor: pointer; color: #14171a; min-height: 64px; }
         .hh-softkey small { display: block; font-size: 11px; color: #4c555e; }
         .hh-softkey strong { font-size: 15px; }
@@ -364,22 +394,26 @@ export default function Home() {
         .hh-mini { background: #2fbf5f; border: 2px solid #0b2b16; border-bottom-width: 4px; border-radius: 6px; font-weight: 700; font-size: 13px; padding: 6px 10px; cursor: pointer; color: #06130a; margin-top: 8px; }
         .hh-mini:disabled { background: #6b7280; border-color: #374151; color: #e5e7eb; cursor: not-allowed; }
         .hh-mini-ghost { background: #39414a; border-color: #14181c; color: #e8edf1; }
-        .hh-voicebar { background: #23282d; border: 3px solid #0f1113; border-radius: 8px; padding: 10px 16px 14px; display: grid; grid-template-columns: 220px 1fr; gap: 12px; align-items: center; grid-column: 1 / -1; }
-        @media (max-width: 760px) { .hh-voicebar { grid-template-columns: 1fr; } }
-        .hh-talk { background: #2fbf5f; border: 2px solid #0b2b16; border-bottom-width: 6px; border-radius: 10px; font-weight: 800; font-size: 16px; padding: 14px; cursor: pointer; color: #06130a; user-select: none; touch-action: none; }
-        .hh-talk:active, .hh-talk[data-on="true"] { background: #e5484d; color: #fff; border-color: #4d0f12; }
-        .hh-wave { width: 100%; height: 84px; border: 2px solid #0f1113; border-radius: 6px; display: block; background: #101315; }
-        .hh-voiceline { color: #d7dee5; font-size: 13px; margin-top: 6px; min-height: 20px; }
-        .hh-links { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; padding: 0 16px 12px; background: #c9ced4; }
+        .hh-voice-wrap { display: flex; justify-content: center; }
+        .hh-voice-card { width: 340px; max-width: 100%; background: #23282d; border: 3px solid #0f1113; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; align-items: center; gap: 10px; box-shadow: 0 2px 0 #0f1113; }
+        .hh-talk-round { width: 108px; height: 108px; border-radius: 50%; background: #2fbf5f; border: 3px solid #0b2b16; border-bottom-width: 8px; font-weight: 800; font-size: 14px; cursor: pointer; color: #06130a; user-select: none; touch-action: none; }
+        .hh-talk-round:active, .hh-talk-round[data-on="true"] { background: #e5484d; color: #fff; border-color: #4d0f12; }
+        .hh-voice-state { color: #d7dee5; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; }
+        .wave-bar { width: 100%; height: 64px; border: 2px solid #0f1113; border-radius: 6px; display: block; background: #101315; }
+        .hh-voiceline { color: #d7dee5; font-size: 12px; min-height: 18px; text-align: center; }
+        .hh-statusbar { background: #23282d; color: #eef1f4; display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-top: 4px solid #0f1113; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; }
+        .hh-statusbar .hh-clock { margin-left: auto; font-size: 12px; color: #aeb6bf; font-variant-numeric: tabular-nums; }
+        .hh-links { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; padding: 0 16px 12px; background: var(--hh-bg); }
         .hh-links a { background: #fff; border: 2px solid #0f1113; border-radius: 6px; padding: 6px 10px; color: #14171a; font-weight: 600; text-decoration: none; }
-        .hh-note { font-size: 12px; color: #3c444c; padding: 0 16px 16px; background: #c9ced4; }
+        .hh-note { font-size: 12px; color: #3c444c; padding: 0 16px 16px; background: var(--hh-bg); }
         .hh-clock { font-size: 12px; color: #aeb6bf; font-variant-numeric: tabular-nums; }
       `}</style>
 
       <div className="hh-topbar">
-        <div>
-          <div className="hh-title">VoiceAndon Smart Factory Console</div>
-          <div className="hh-subtitle">Shop-floor demo console · fictional sample data only</div>
+        <div className="hh-brand">VoiceAndon</div>
+        <div className="hh-console">
+          Smart Factory Console
+          <span className="hh-auto">AUTO RUN</span>
         </div>
         <div className="hh-lamps" role="status" aria-label="Shop status">
           <span className="hh-clock">{clock}</span>
@@ -389,8 +423,8 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="hh-body">
-        <section className="hh-screen" aria-label={`${funcKey} screen`} aria-live="polite">
+      <div className="hh-main">
+        <section className="hh-screen hh-screen-dark" aria-label={`${funcKey} screen`} aria-live="polite">
           {funcKey === "F1" && (
             <div>
               <h2>F1 · OVERVIEW — 5 STATIONS (TAP A CARD)</h2>
@@ -398,7 +432,7 @@ export default function Home() {
                 {machines.map((m) => (
                   <div
                     key={m.id}
-                    className="hh-card hh-card-click"
+                    className={`hh-card hh-card-click${m.status === "alarm" ? " hh-alarm-frame" : ""}`}
                     role="button"
                     tabIndex={0}
                     aria-pressed={selectedId === m.id}
@@ -412,9 +446,9 @@ export default function Home() {
                   >
                     <div className="hh-row">
                       <span className={lampClass(m.status)}>{lampText(m.status)}</span>
-                      <h3>{m.id}</h3>
+                      <h3>{STATION_NAMES[m.id] ?? m.id}</h3>
                     </div>
-                    <div className="hh-meta">{m.name}</div>
+                    <div className="hh-meta">{m.id} · {m.name}</div>
                     <div className="hh-meta">{m.location}</div>
                     <div className="hh-meta">
                       Material left: {m.material_left}%{m.current_alarm ? ` · Alarm ${m.current_alarm}` : ""}
@@ -472,6 +506,34 @@ export default function Home() {
                   </ol>
                 </div>
               )}
+              <div className="hh-midrow">
+                <div className="hh-card">
+                  <h3>Servo monitor · J1–J3 (demo figures{jointTick ? ` · ${jointTick}` : ""})</h3>
+                  {servoJoints.map((j) => (
+                    <div key={j.joint} className="hh-row" style={{ marginTop: 4 }}>
+                      <span className="hh-meta" style={{ width: 28 }}>{j.joint}</span>
+                      <span className={j.load >= 70 ? "hh-low" : "hh-ok"}>Load {j.load.toFixed(1)}%</span>
+                      <span className={j.temp >= 60 ? "hh-low" : ""} style={{ color: j.temp >= 60 ? undefined : "#aeb9c4" }}>
+                        {j.temp.toFixed(1)}°C
+                      </span>
+                    </div>
+                  ))}
+                  <div className="hh-meta" style={{ marginTop: 6 }}>
+                    Local random-walk preview — not sensor readings.
+                  </div>
+                </div>
+                <div className="hh-card">
+                  <h3>AI summary · CLOSED-LOOP (demo)</h3>
+                  <div className="hh-meta">
+                    {alarmMachine
+                      ? `Open alarm on ${alarmMachine.id} (${alarmMachine.current_alarm ?? "—"}). Suggested loop: acknowledge → first checks → confirm → ticket.`
+                      : "No open alarms. Loop closed: all 5 stations reporting normal (demo data)."}
+                  </div>
+                  <div className="hh-meta" style={{ marginTop: 4 }}>
+                    Low stock stations: {lowStations.length === 0 ? "none" : lowStations.map((m) => m.id).join(", ")} (demo).
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -672,7 +734,7 @@ export default function Home() {
           )}
         </section>
 
-        <nav className="hh-keys" aria-label="Function keys">
+        <nav className="hh-fkeys" aria-label="Function keys">
           {FUNC_KEYS.map((f) => (
             <button
               key={f.key}
@@ -687,11 +749,11 @@ export default function Home() {
           ))}
         </nav>
 
-        <div className="hh-voicebar">
-          <div>
+        <div className="hh-voice-wrap">
+          <div className="hh-voice-card" aria-label="Voice dispatch card">
             <button
               type="button"
-              className="hh-talk"
+              className="hh-talk-round"
               data-on={talking}
               aria-label="Hold to talk (demo preview)"
               onMouseDown={startTalk}
@@ -701,13 +763,19 @@ export default function Home() {
             >
               {talking ? "● TALKING… release" : "HOLD TO TALK"}
             </button>
-            <div className="hh-voiceline">{muted ? "Console muted." : talking ? "Recording preview…" : "Ready."}</div>
-          </div>
-          <div>
-            <canvas ref={canvasRef} className="hh-wave" width={640} height={84} aria-label="Voice waveform preview" />
-            <div className="hh-voiceline" aria-live="polite">{voiceLine}</div>
+            <div className="hh-voice-state">{voiceState}</div>
+            <canvas ref={canvasRef} className="wave-bar" width={300} height={64} aria-label="Voice waveform preview" />
+            <div className="hh-voiceline" aria-live="polite">{muted ? "Console muted." : voiceLine}</div>
           </div>
         </div>
+      </div>
+
+      <div className="hh-statusbar" role="status" aria-label="Console status">
+        <span className={alarmCount > 0 ? "hh-lamp hh-lamp-alarm" : "hh-lamp hh-lamp-ready"}>
+          {alarmCount > 0 ? `STATUS · ALARM ×${alarmCount}` : "STATUS · READY"}
+        </span>
+        <span>{alarmMachine ? `${alarmMachine.id} / alarm ${alarmMachine.current_alarm ?? "—"} (demo)` : "All stations normal (demo)"}</span>
+        <span className="hh-clock">{clock}</span>
       </div>
 
       <div className="hh-links">
