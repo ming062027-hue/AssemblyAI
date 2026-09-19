@@ -11,7 +11,7 @@
 //   F2 AGV 4 台可點派車（本機狀態、不控制真車）；F3 J1–J6 負載/溫度每 1.5 秒本機跳動（示意、非感測值）；
 //   F4 S45C 庫存 <50 紅字＋一鍵催料鈕（本機旗標、未連線）；F5 通訊錄明細（虛構技師＋示範單號 #TICKET-8902 / #PO-DEMO-…）；
 //   F6 重置（只清本頁預覽狀態，F6 燈回綠；實際機台狀態以 F1 為準）。
-// - 語音鍵：按住說話（mousedown / mouseup＋觸控），波形為本機示意動畫；不改語音線任何邏輯，
+// - 語音鍵：按一下開始、再按一下關閉（click toggle），波形為本機示意動畫；不改語音線任何邏輯，
 //   不連 AssemblyAI、不讀金鑰。真的語音 Demo 走 /operator（語音線負責）。
 
 import Link from "next/link";
@@ -130,7 +130,7 @@ export default function Home() {
   const [muted, setMuted] = useState(false);
   const [talking, setTalking] = useState(false);
   const [voiceLine, setVoiceLine] = useState(
-    "Hold the voice key and speak. This console shows a local waveform preview only.",
+    "Tap the voice key to start. This console shows a local waveform preview only.",
   );
   const [clock, setClock] = useState("");
   // F1：點選機台看明細。
@@ -245,35 +245,23 @@ export default function Home() {
     return () => clearInterval(id);
   }, []);
 
-  const startTalk = useCallback(() => {
+  // 語音鍵：按一下開始、再按一下關閉（click toggle，本機預覽）。
+  const toggleTalk = useCallback(() => {
+    if (talking) {
+      // Demo preview text built from existing data (M03 / 414), no voice logic touched.
+      setTalking(false);
+      setVoiceLine(
+        "Preview: “Machine three has an alarm” → M03 / alarm 414 (Spindle load abnormal (demo)). Real voice demo runs on /operator.",
+      );
+      return;
+    }
     if (muted) {
       setVoiceLine("Console is muted (F6). Unmute before the voice preview.");
       return;
     }
     setTalking(true);
-    setVoiceLine("Listening (local preview)… release the key to finish.");
-  }, [muted]);
-
-  const stopTalk = useCallback(() => {
-    setTalking((was) => {
-      if (was) {
-        // Demo preview text built from existing data (M03 / 414), no voice logic touched.
-        setVoiceLine(
-          "Preview: “Machine three has an alarm” → M03 / alarm 414 (Spindle load abnormal (demo)). Real voice demo runs on /operator.",
-        );
-      }
-      return false;
-    });
-  }, []);
-
-  useEffect(() => {
-    window.addEventListener("mouseup", stopTalk);
-    window.addEventListener("touchend", stopTalk);
-    return () => {
-      window.removeEventListener("mouseup", stopTalk);
-      window.removeEventListener("touchend", stopTalk);
-    };
-  }, [stopTalk]);
+    setVoiceLine("Listening (local preview)… tap the key again to finish.");
+  }, [muted, talking]);
 
   // F2 派車／召回（本機狀態）。
   const dispatchAgv = useCallback((id: string) => {
@@ -322,7 +310,7 @@ export default function Home() {
     setSelectedId(null);
     setMuted(false);
     setAgvMsg("Tap Dispatch on an idle AGV (console preview only, no vehicle is controlled).");
-    setVoiceLine("Hold the voice key and speak. This console shows a local waveform preview only.");
+    setVoiceLine("Tap the voice key to start. This console shows a local waveform preview only.");
     setResetMsg(`Console reset at ${nowTime()} — status lamp back to green (preview only).`);
   }, []);
 
@@ -755,13 +743,11 @@ export default function Home() {
               type="button"
               className="hh-talk-round"
               data-on={talking}
-              aria-label="Hold to talk (demo preview)"
-              onMouseDown={startTalk}
-              onTouchStart={startTalk}
-              onMouseUp={stopTalk}
-              onMouseLeave={stopTalk}
+              aria-label="Tap to talk (demo preview)"
+              aria-pressed={talking}
+              onClick={toggleTalk}
             >
-              {talking ? "● TALKING… release" : "HOLD TO TALK"}
+              {talking ? "● TALKING… tap to stop" : "TAP TO TALK"}
             </button>
             <div className="hh-voice-state">{voiceState}</div>
             <canvas ref={canvasRef} className="wave-bar" width={300} height={64} aria-label="Voice waveform preview" />
