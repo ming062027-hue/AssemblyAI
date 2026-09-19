@@ -1,24 +1,22 @@
 "use client";
 
-// 看板資料線：首頁＝車間控制台風格（自有樣式，不含任何第三方品牌字樣）。
-// - 版式（依主控派工單文字描述還原；原始 HTML 全文未收到，見交接檔 13n）：
-//   頂部深色列（VoiceAndon｜Smart Factory Console＋綠色 AUTO RUN｜READY/ALARM＋時間）、
-//   5 站卡（01碼頭–05品檢，紅框標示實際告警站）、左下伺服 J1–J3、右下 AI 摘要 CLOSED-LOOP、
-//   F1–F6 橫排軟鍵、底部 STATUS 列。
-//   語音卡保持固定寬度（不拉全寬），置於主內容最底下置中；右側語音區已移除。
-// - CSS 變數 --hh-bg:#c9d0db、--hh-panel:#dce2ec 照派工單採用；其餘為同色系延伸。
-// - F1–F6 可點、可按鍵盤 F1–F6 真切換；內容只用 src/data 現有 M01–M05 / 警報 / 保養（自編示範資料）。
-//   F2 AGV 4 台可點派車（本機狀態、不控制真車）；F3 J1–J6 負載/溫度每 1.5 秒本機跳動（示意、非感測值）；
-//   F4 S45C 庫存 <50 紅字＋一鍵催料鈕（本機旗標、未連線）；F5 通訊錄明細（虛構技師＋示範單號 #TICKET-8902 / #PO-DEMO-…）；
-//   F6 重置（只清本頁預覽狀態，F6 燈回綠；實際機台狀態以 F1 為準）。
-// - 語音鍵：按一下開始、再按一下關閉（click toggle），波形為本機示意動畫；不改語音線任何邏輯，
-//   不連 AssemblyAI、不讀金鑰。真的語音 Demo 走 /operator（語音線負責）。
+// 看板資料線：首頁＝ preview-cnc640.html 的 Next.js 版（版式照靜態版搬）。
+// - 版式／文字來源：app/public/preview-cnc640.html（CNC-640 智慧工廠戰情中心；
+//   HEIDENHAIN／TNC 字樣已清為 CNC-640，本頁沿用，不加回去）。
+// - 接真假資料：F1 站卡頁尾接 machines.json（狀態／料量）；04 警報卡接 M03／414
+//  （alarms.json 標題＋三步檢查；靜態版寫 E-402，為接資料改 414，均為自編示範碼）；
+//   F4 S45C 庫存接 M03.material_left（下限 50）；F5 維修／採購單號沿用靜態版示範編號。
+// - F1–F5 按鈕＋鍵盤 F1–F6 真切換；F2 派車、F4 催料為本機訊息（不控制真車、不下單）；
+//   F6 重置可點（第一次→靜音＋綠燈，第二次→整頁 reload）。
+// - 語音：沿用 /api/voice-stream mock（POST {type:"stop"} 回 TRANSCRIPT＋INTENT），
+//   18 語下拉只做示意（mock STT 照樣回示範映射）；不連 AssemblyAI、不讀金鑰。
+// - 圖示：靜態版用 lucide CDN，本頁改用 ◆ ● ▶ 文字符號（家規允許字元），免外部連線；
+//   Tailwind 工具類沿用（專案內建 Tailwind，不掛 CDN）。
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import alarmsData from "../data/alarms.json" with { type: "json" };
 import machinesData from "../data/machines.json" with { type: "json" };
-import maintenanceData from "../data/maintenance.json" with { type: "json" };
 
 interface Machine {
   id: string;
@@ -38,743 +36,839 @@ interface Alarm {
   needs_technician: boolean;
 }
 
-interface MaintenanceRecord {
-  machine_id: string;
-  date: string;
-  item: string;
-  technician: string;
-}
-
 const machines = machinesData as Machine[];
 const alarms = alarmsData as Alarm[];
-const maintenanceRecords = maintenanceData as MaintenanceRecord[];
 
-type FuncKey = "F1" | "F2" | "F3" | "F4" | "F5" | "F6";
+type ViewKey = "f1" | "f2" | "f3" | "f4" | "f5";
 
-const FUNC_KEYS: { key: FuncKey; label: string; hint: string }[] = [
-  { key: "F1", label: "Overview", hint: "5 stations" },
-  { key: "F2", label: "Transport", hint: "4 AGVs" },
-  { key: "F3", label: "Axis data", hint: "J1–J6 live" },
-  { key: "F4", label: "Stock", hint: "S45C" },
-  { key: "F5", label: "Contacts", hint: "tickets / POs" },
-  { key: "F6", label: "Mute / Reset", hint: "back to green" },
-];
-
-// 站號中文名：派工單只給 01碼頭、05品檢，中間三站不猜，用資料 location。
-const STATION_NAMES: Record<string, string> = {
-  M01: "01 · 碼頭",
-  M02: "02",
-  M03: "03",
-  M04: "04",
-  M05: "05 · 品檢",
+const TAB_NAMES: Record<ViewKey, string> = {
+  f1: "F1 流程監控總覽",
+  f2: "F2 AGV 車隊手動調度",
+  f3: "F3 手臂軸向數據分析",
+  f4: "F4 原料庫存與補叫料",
+  f5: "F5 AI 外部通訊錄明細",
 };
 
-function lampClass(status: string): string {
-  if (status === "alarm") return "hh-lamp hh-lamp-alarm";
-  if (status === "stopped") return "hh-lamp hh-lamp-stopped";
-  return "hh-lamp hh-lamp-ready";
-}
-
-function lampText(status: string): string {
-  if (status === "alarm") return "ALARM";
-  if (status === "stopped") return "STOP";
-  return "READY";
-}
-
-type AgvStatus = "idle" | "enroute" | "charging";
-
-interface Agv {
-  id: string;
-  route: string;
-  battery: number;
-  status: AgvStatus;
-  task: string;
-}
-
-// 4 台 AGV 初始狀態（全虛構示意數字，不控制真車）。
-const AGV_INITIAL: Agv[] = [
-  { id: "AGV-1", route: "Bay A → Bay B", battery: 76, status: "idle", task: "Standby at Bay A (demo)" },
-  { id: "AGV-2", route: "Bay C loop", battery: 94, status: "charging", task: "Charging at Bay C dock (demo)" },
-  { id: "AGV-3", route: "Bay B → Wash", battery: 61, status: "idle", task: "Standby at Bay B (demo)" },
-  { id: "AGV-4", route: "WH → Bay A", battery: 55, status: "idle", task: "Standby at warehouse (demo)" },
+// 語音 mock 示範句（靜態版三句原樣保留）。
+const SAMPLE_PHRASES = [
+  "「請 AGV 2 號前往 1 號手臂區補送中碳鋼物料。」",
+  "「Robot station 2 is running out of raw parts, send AGV immediately.」",
+  "「2 號機械手臂卡阻，立刻指派原廠維修。」",
 ];
 
-interface Joint {
-  joint: string;
-  load: number; // %（虛構示意）
-  temp: number; // °C（虛構示意）
-}
-
-// 手臂 J1–J6 初始值（虛構示意，非感測值）。
-const JOINT_INITIAL: Joint[] = [
-  { joint: "J1", load: 32, temp: 41.5 },
-  { joint: "J2", load: 45, temp: 44.0 },
-  { joint: "J3", load: 28, temp: 40.2 },
-  { joint: "J4", load: 51, temp: 46.8 },
-  { joint: "J5", load: 22, temp: 39.4 },
-  { joint: "J6", load: 18, temp: 38.1 },
+// 18 語下拉（示意：mock STT 不做真辨識，選哪個都走同一 mock 映射）。
+const VOICE_LANGS = [
+  { code: "zh-TW", label: "繁體中文" },
+  { code: "zh-CN", label: "简体中文" },
+  { code: "en", label: "English" },
+  { code: "ja", label: "日本語" },
+  { code: "ko", label: "한국어" },
+  { code: "es", label: "Español" },
+  { code: "fr", label: "Français" },
+  { code: "de", label: "Deutsch" },
+  { code: "pt", label: "Português" },
+  { code: "it", label: "Italiano" },
+  { code: "nl", label: "Nederlands" },
+  { code: "ru", label: "Русский" },
+  { code: "ar", label: "العربية" },
+  { code: "hi", label: "हिन्दी" },
+  { code: "th", label: "ไทย" },
+  { code: "vi", label: "Tiếng Việt" },
+  { code: "id", label: "Bahasa Indonesia" },
+  { code: "fil", label: "Filipino" },
 ];
 
-// F5 示範單號（全虛構，只做通訊錄明細示意，不對應真實工單／採購單）。
-const DEMO_TICKETS = ["#TICKET-8902", "#TICKET-8905", "#TICKET-8911"];
-const DEMO_POS = ["#PO-DEMO-0841", "#PO-DEMO-0842", "#PO-DEMO-0843"];
-
-function nowTime(): string {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-}
+const STOCK_LOW_LINE = 50;
 
 export default function Home() {
-  const [funcKey, setFuncKey] = useState<FuncKey>("F1");
-  const [muted, setMuted] = useState(false);
-  const [talking, setTalking] = useState(false);
-  const [voiceLine, setVoiceLine] = useState(
-    "Tap the voice key to start. This console shows a local waveform preview only.",
+  const [view, setView] = useState<ViewKey>("f1");
+  const [isAlarm, setIsAlarm] = useState(true);
+  const [clock, setClock] = useState("--:--:--");
+  const [agvMsg, setAgvMsg] = useState<string | null>(null);
+  const [supplierMsg, setSupplierMsg] = useState<string | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState("待命中 (STANDBY)");
+  const [voiceStatusHot, setVoiceStatusHot] = useState(false);
+  const [speechText, setSpeechText] = useState(SAMPLE_PHRASES[0]);
+  const [voiceLang, setVoiceLang] = useState("zh-TW");
+  const [intentLine, setIntentLine] = useState(
+    "Mock 語音管線待命：按下說話→經 /api/voice-stream 回 INTENT（本機、不花錢）。",
   );
-  const [clock, setClock] = useState("");
-  // F1：點選機台看明細。
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  // F2：4 台 AGV 派車狀態（本機）。
-  const [agvs, setAgvs] = useState<Agv[]>(AGV_INITIAL);
-  const [agvMsg, setAgvMsg] = useState("Tap Dispatch on an idle AGV (console preview only, no vehicle is controlled).");
-  // F3：J1–J6 本機跳動。
-  const [joints, setJoints] = useState<Joint[]>(JOINT_INITIAL);
-  const [jointTick, setJointTick] = useState("");
-  // F4：S45C 催料旗標（本機、未連線）。
-  const [urged, setUrged] = useState<Record<string, string>>({});
-  // F6：重置回綠（只清本頁預覽）。
-  const [resetMsg, setResetMsg] = useState("Console status: preview only. Press Reset to clear this page.");
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const animRef = useRef<number>(0);
-  const talkingRef = useRef(false);
+  const phraseIdx = useRef(0);
+  const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const alarmByCode = useCallback((code: string | null) => {
-    if (!code) return undefined;
-    return alarms.find((a) => a.code === code);
-  }, []);
+  const alarmMachine = machines.find((m) => m.status === "alarm");
+  const alarmCount = isAlarm && alarmMachine ? 1 : 0;
+  const alarm414 = alarms.find((a) => a.code === "414");
+  const stockMachine = machines.find((m) => m.id === "M03");
 
-  const alarmCount = machines.filter((m) => m.status === "alarm").length;
+  const flashMsg = useCallback(
+    (setter: (v: string | null) => void, text: string, ms: number) => {
+      setter(text);
+      if (msgTimer.current) clearTimeout(msgTimer.current);
+      msgTimer.current = setTimeout(() => setter(null), ms);
+    },
+    [],
+  );
 
-  // Clock (console header only).
   useEffect(() => {
-    const tick = () => {
-      const d = new Date();
-      const p = (n: number) => String(n).padStart(2, "0");
-      setClock(`${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`);
-    };
+    const tick = () =>
+      setClock(new Date().toLocaleTimeString("zh-TW", { hour12: false }));
     tick();
-    const id = setInterval(tick, 10000);
+    const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, []);
 
-  // Physical F1–F6 keys switch screens (prevent browser help on F1).
+  useEffect(
+    () => () => {
+      if (msgTimer.current) clearTimeout(msgTimer.current);
+    },
+    [],
+  );
+
+  // F6：第一次→靜音＋綠燈，第二次→整頁 reload（靜態版同一行為）。
+  const resetAlarm = useCallback(() => {
+    if (isAlarm) {
+      setIsAlarm(false);
+      flashMsg(
+        setAgvMsg,
+        "已靜音全廠廣播，並重置系統報警狀態為正常待命。",
+        3500,
+      );
+    } else {
+      window.location.reload();
+    }
+  }, [flashMsg, isAlarm]);
+
+  // 鍵盤 F1–F6 真切換（F6＝重置）。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const map: Record<string, FuncKey> = {
-        F1: "F1",
-        F2: "F2",
-        F3: "F3",
-        F4: "F4",
-        F5: "F5",
-        F6: "F6",
+      const map: Record<string, ViewKey> = {
+        F1: "f1",
+        F2: "f2",
+        F3: "f3",
+        F4: "f4",
+        F5: "f5",
       };
       const target = map[e.key];
       if (target) {
         e.preventDefault();
-        setFuncKey(target);
+        setView(target);
+      } else if (e.key === "F6") {
+        e.preventDefault();
+        resetAlarm();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [resetAlarm]);
 
-  // Waveform preview: local canvas animation only (no audio captured here).
-  useEffect(() => {
-    talkingRef.current = talking;
-  }, [talking]);
+  const switchTab = useCallback((key: ViewKey) => setView(key), []);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const bars = 48;
-    let phase = 0;
-    const draw = () => {
-      const w = canvas.width;
-      const h = canvas.height;
-      ctx.clearRect(0, 0, w, h);
-      ctx.fillStyle = "#101315";
-      ctx.fillRect(0, 0, w, h);
-      const active = talkingRef.current && !muted;
-      phase += active ? 0.55 : 0.05;
-      for (let i = 0; i < bars; i++) {
-        const base = active
-          ? Math.abs(Math.sin(phase + i * 0.45)) * (h * 0.42) + 3
-          : 3;
-        const x = (w / bars) * i + 1;
-        ctx.fillStyle = active ? "#7CFC9A" : "#3a4147";
-        ctx.fillRect(x, h / 2 - base / 2, w / bars - 2, base);
-      }
-      // Center line.
-      ctx.fillStyle = "#565e66";
-      ctx.fillRect(0, h / 2, w, 1);
-      animRef.current = requestAnimationFrame(draw);
-    };
-    animRef.current = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(animRef.current);
-  }, [muted]);
+  const dispatchAgv = useCallback(
+    (id: string, task: string) => {
+      flashMsg(setAgvMsg, `［調度完成］${id} 收到指令：『${task}』。`, 3500);
+    },
+    [flashMsg],
+  );
 
-  // F3: J1–J6 本機即時跳動（示意數字，非感測值；切到別頁也繼續跑，耗電極低）。
-  useEffect(() => {
-    const id = setInterval(() => {
-      setJoints((prev) =>
-        prev.map((j) => {
-          const load = Math.min(95, Math.max(5, j.load + (Math.random() * 6 - 3)));
-          const temp = Math.min(72, Math.max(30, j.temp + (Math.random() * 1.2 - 0.6)));
-          return {
-            joint: j.joint,
-            load: Math.round(load * 10) / 10,
-            temp: Math.round(temp * 10) / 10,
-          };
-        }),
+  const callSupplierManual = useCallback(
+    (mat: string) => {
+      flashMsg(
+        setSupplierMsg,
+        `［AI通話完成］已致電供應商催促『${mat}』，工單已建立。`,
+        4000,
       );
-      setJointTick(nowTime());
-    }, 1500);
-    return () => clearInterval(id);
-  }, []);
+    },
+    [flashMsg],
+  );
 
-  // 語音鍵：按一下開始、再按一下關閉（click toggle，本機預覽）。
-  const toggleTalk = useCallback(() => {
-    if (talking) {
-      // Demo preview text built from existing data (M03 / 414), no voice logic touched.
-      setTalking(false);
-      setVoiceLine(
-        "Preview: “Machine three has an alarm” → M03 / alarm 414 (Spindle load abnormal (demo)). Real voice demo runs on /operator.",
-      );
+  // 語音 toggle：開始→錄音中＋波形；停止→POST /api/voice-stream mock 取 INTENT。
+  const toggleVoiceRecording = useCallback(async () => {
+    if (!recording) {
+      setRecording(true);
+      setVoiceStatus("語音辨識中...");
+      setVoiceStatusHot(true);
+      setSpeechText("正在聆聽語音輸入...");
       return;
     }
-    if (muted) {
-      setVoiceLine("Console is muted (F6). Unmute before the voice preview.");
-      return;
+    setRecording(false);
+    setVoiceStatus("AI 語意解析完成");
+    setVoiceStatusHot(false);
+    const phrase = SAMPLE_PHRASES[phraseIdx.current % SAMPLE_PHRASES.length];
+    phraseIdx.current += 1;
+    try {
+      const res = await fetch("/api/voice-stream", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type: "stop", transcript: phrase, lang: voiceLang }),
+      });
+      const data = (await res.json()) as {
+        messages?: {
+          type?: string;
+          action?: string;
+          target?: string | null;
+          transcript?: string;
+        }[];
+      };
+      const intent = (data.messages ?? []).find(
+        (m) => m.type === "INTENT_RESOLVED",
+      );
+      setSpeechText(phrase);
+      setIntentLine(
+        intent
+          ? `Mock INTENT → action=${intent.action ?? "?"} target=${intent.target ?? "-"}（${voiceLang}，本機 mock）`
+          : "Mock 回應無 INTENT（本機）。",
+      );
+    } catch {
+      setSpeechText(phrase);
+      setIntentLine("Mock 管線連不上（本機 dev 未跑？），顯示示範句。");
     }
-    setTalking(true);
-    setVoiceLine("Listening (local preview)… tap the key again to finish.");
-  }, [muted, talking]);
+  }, [recording, voiceLang]);
 
-  // F2 派車／召回（本機狀態）。
-  const dispatchAgv = useCallback((id: string) => {
-    setAgvs((prev) =>
-      prev.map((a) =>
-        a.id === id && a.status === "idle"
-          ? { ...a, status: "enroute", task: `Blanks to M04 queue, dispatched ${nowTime()} (demo)` }
-          : a,
-      ),
-    );
-    setAgvMsg(`${id} dispatched to M04 queue at ${nowTime()} (demo preview, no vehicle is controlled).`);
-  }, []);
-
-  const recallAgv = useCallback((id: string) => {
-    setAgvs((prev) =>
-      prev.map((a) =>
-        a.id === id && a.status === "enroute"
-          ? { ...a, status: "idle", task: `Returned to standby ${nowTime()} (demo)` }
-          : a,
-      ),
-    );
-    setAgvMsg(`${id} recalled to standby (demo).`);
-  }, []);
-
-  // F4 催料（本機旗標，未連線）。
-  const urgeOne = useCallback((id: string) => {
-    setUrged((prev) => ({ ...prev, [id]: nowTime() }));
-  }, []);
-
-  const urgeAllLow = useCallback(() => {
-    const t = nowTime();
-    setUrged((prev) => {
-      const next = { ...prev };
-      for (const m of machines) {
-        if (m.material_left < 50) next[m.id] = t;
-      }
-      return next;
-    });
-  }, []);
-
-  // F6 重置回綠（只清本頁預覽狀態，不碰單子、不碰機台資料）。
-  const resetConsole = useCallback(() => {
-    setAgvs(AGV_INITIAL);
-    setJoints(JOINT_INITIAL);
-    setUrged({});
-    setSelectedId(null);
-    setMuted(false);
-    setAgvMsg("Tap Dispatch on an idle AGV (console preview only, no vehicle is controlled).");
-    setVoiceLine("Tap the voice key to start. This console shows a local waveform preview only.");
-    setResetMsg(`Console reset at ${nowTime()} — status lamp back to green (preview only).`);
-  }, []);
-
-  const technicians = Array.from(new Set(maintenanceRecords.map((r) => r.technician)));
-  const alarm414 = alarms.find((a) => a.code === "414");
-  const otherAlarms = alarms.filter((a) => a.code !== "414").slice(0, 3);
-  const selected = machines.find((m) => m.id === selectedId);
-  const selectedAlarm = alarmByCode(selected?.current_alarm ?? null);
-  const selectedJobs = selected ? maintenanceRecords.filter((r) => r.machine_id === selected.id).slice(0, 2) : [];
-  const lowStations = machines.filter((m) => m.material_left < 50);
-  const dispatchedCount = agvs.filter((a) => a.status === "enroute").length;
-  const servoJoints = joints.slice(0, 3);
-  const alarmMachine = machines.find((m) => m.status === "alarm");
-  const voiceState = muted ? "已靜音" : talking ? "錄音中" : "待命中";
+  const stationOf = (id: string) => machines.find((m) => m.id === id);
 
   return (
-    <main className="hh-root">
+    <main className="min-h-full flex flex-col select-none">
       <style>{`
         :root {
           --hh-bg: #c9d0db;
           --hh-panel: #dce2ec;
+          --hh-border: #7e889b;
+          --hh-blue: #0056b3;
+          --hh-text: #14181f;
         }
-        .hh-root { background: var(--hh-bg); color: #16191c; min-height: 100%; display: flex; flex-direction: column; }
-        .hh-topbar { background: #23282d; color: #eef1f4; display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 4px solid #0f1113; }
-        .hh-brand { font-weight: 800; letter-spacing: 0.04em; font-size: 20px; white-space: nowrap; }
-        .hh-console { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 700; color: #c7d2dc; }
-        .hh-auto { background: #2fbf5f; color: #06130a; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 4px; border: 2px solid #0b2b16; letter-spacing: 0.06em; }
-        .hh-lamps { display: flex; gap: 8px; margin-left: auto; align-items: center; }
-        .hh-lamp { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 2px solid #0f1113; color: #0f1113; background: #8b939c; white-space: nowrap; }
-        .hh-lamp::before { content: ""; width: 10px; height: 10px; border-radius: 999px; background: #4a5158; }
-        .hh-lamp-ready { background: #2fbf5f; color: #06130a; }
-        .hh-lamp-ready::before { background: #d6ffe2; box-shadow: 0 0 6px #d6ffe2; }
-        .hh-lamp-alarm { background: #e5484d; color: #fff; animation: hh-blink 1s steps(2) infinite; }
-        .hh-lamp-alarm::before { background: #fff; box-shadow: 0 0 8px #fff; }
-        .hh-lamp-stopped { background: #f5a524; color: #241500; }
-        .hh-lamp-stopped::before { background: #fff7e6; }
-        @keyframes hh-blink { 50% { filter: brightness(0.75); } }
-        .hh-main { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; flex: 1; }
-        .hh-screen { background: var(--hh-panel); color: #16191c; border: 3px solid #0f1113; border-radius: 8px; padding: 14px; box-shadow: 0 2px 0 #0f1113; }
-        .hh-screen-dark { background: #1b1f23; color: #e8edf1; }
-        .hh-screen h2 { font-size: 14px; color: #4c555e; margin: 0 0 10px; font-weight: 700; letter-spacing: 0.06em; }
-        .hh-screen-dark h2 { color: #9fb0bd; }
-        .hh-card { background: #242a30; border: 1px solid #3a424b; border-radius: 6px; padding: 10px 12px; color: #e8edf1; }
-        .hh-card-light { background: #f4f6f9; border: 1px solid #9aa3ad; color: #16191c; }
-        .hh-card h3 { margin: 0 0 4px; font-size: 15px; }
-        .hh-card-click { cursor: pointer; }
-        .hh-card-click[aria-pressed="true"] { border-color: #7CFC9A; box-shadow: 0 0 0 2px #7CFC9A; }
-        .hh-alarm-frame { border: 3px solid #e5484d; box-shadow: 0 0 0 2px #e5484d, 0 0 12px rgba(229,72,77,0.55); }
-        .hh-meta { font-size: 12px; color: #aeb9c4; }
-        .hh-card-light .hh-meta { color: #4c555e; }
-        .hh-grid5 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-        .hh-midrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-        @media (max-width: 760px) { .hh-midrow { grid-template-columns: 1fr; } }
-        .hh-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-        .hh-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .hh-table th, .hh-table td { border: 1px solid #3a424b; padding: 6px 8px; text-align: left; }
-        .hh-table th { background: #2b3239; color: #c7d2dc; }
-        .hh-low { color: #ff8a8e; font-weight: 800; }
-        .hh-card-light .hh-low { color: #c81e2b; }
-        .hh-ok { color: #7CFC9A; font-weight: 800; }
-        .hh-card-light .hh-ok { color: #137a3a; }
-        .hh-fkeys { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
-        @media (max-width: 760px) { .hh-fkeys { grid-template-columns: repeat(3, 1fr); } }
-        .hh-softkey { background: linear-gradient(#f2f4f6, #c3c9d0); border: 2px solid #0f1113; border-bottom-width: 5px; border-radius: 8px; padding: 10px 8px; text-align: left; cursor: pointer; color: #14171a; min-height: 64px; }
-        .hh-softkey small { display: block; font-size: 11px; color: #4c555e; }
-        .hh-softkey strong { font-size: 15px; }
-        .hh-softkey[aria-pressed="true"] { background: linear-gradient(#3a424b, #23282d); color: #fff; }
-        .hh-softkey[aria-pressed="true"] small { color: #aeb9c4; }
-        .hh-mini { background: #2fbf5f; border: 2px solid #0b2b16; border-bottom-width: 4px; border-radius: 6px; font-weight: 700; font-size: 13px; padding: 6px 10px; cursor: pointer; color: #06130a; margin-top: 8px; }
-        .hh-mini:disabled { background: #6b7280; border-color: #374151; color: #e5e7eb; cursor: not-allowed; }
-        .hh-mini-ghost { background: #39414a; border-color: #14181c; color: #e8edf1; }
-        .hh-voice-wrap { display: flex; justify-content: center; }
-        .hh-voice-card { width: 340px; max-width: 100%; background: #23282d; border: 3px solid #0f1113; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; align-items: center; gap: 10px; box-shadow: 0 2px 0 #0f1113; }
-        .hh-talk-round { width: 108px; height: 108px; border-radius: 50%; background: #2fbf5f; border: 3px solid #0b2b16; border-bottom-width: 8px; font-weight: 800; font-size: 14px; cursor: pointer; color: #06130a; user-select: none; touch-action: none; }
-        .hh-talk-round:active, .hh-talk-round[data-on="true"] { background: #e5484d; color: #fff; border-color: #4d0f12; }
-        .hh-voice-state { color: #d7dee5; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; }
-        .wave-bar { width: 100%; height: 64px; border: 2px solid #0f1113; border-radius: 6px; display: block; background: #101315; }
-        .hh-voiceline { color: #d7dee5; font-size: 12px; min-height: 18px; text-align: center; }
-        .hh-statusbar { background: #23282d; color: #eef1f4; display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-top: 4px solid #0f1113; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; }
-        .hh-statusbar .hh-clock { margin-left: auto; font-size: 12px; color: #aeb6bf; font-variant-numeric: tabular-nums; }
-        .hh-links { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; padding: 0 16px 12px; background: var(--hh-bg); }
-        .hh-links a { background: #fff; border: 2px solid #0f1113; border-radius: 6px; padding: 6px 10px; color: #14171a; font-weight: 600; text-decoration: none; }
-        .hh-note { font-size: 12px; color: #3c444c; padding: 0 16px 16px; background: var(--hh-bg); }
-        .hh-clock { font-size: 12px; color: #aeb6bf; font-variant-numeric: tabular-nums; }
+        .hh-card {
+          background-color: var(--hh-panel);
+          border: 1.5px solid var(--hh-border);
+          box-shadow: inset 1px 1px 0px rgba(255,255,255,0.7), 2px 2px 5px rgba(0,0,0,0.08);
+        }
+        .hh-softkey {
+          background: linear-gradient(180deg, #eef2f7 0%, #cbd3e0 100%);
+          border: 1px solid #727c8d;
+          box-shadow: inset 1px 1px 0 rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.15);
+          transition: all 0.1s ease;
+        }
+        .hh-softkey:active {
+          background: linear-gradient(180deg, #b8c2d1 0%, #d8dfea 100%);
+          transform: translateY(1px);
+        }
+        .hh-softkey.active {
+          border: 2px solid #0056b3;
+          background: #e1ebf7;
+        }
+        .cam-overlay {
+          background: repeating-linear-gradient(
+            0deg,
+            rgba(0, 0, 0, 0.15),
+            rgba(0, 0, 0, 0.15) 1px,
+            transparent 1px,
+            transparent 2px
+          );
+        }
+        .wave-bar { display: inline-block; width: 3px; height: 10px; background-color: #0056b3; border-radius: 2px; animation: wave 1s ease-in-out infinite; }
+        .wave-bar:nth-child(2) { animation-delay: 0.15s; }
+        .wave-bar:nth-child(3) { animation-delay: 0.3s; }
+        .wave-bar:nth-child(4) { animation-delay: 0.45s; }
+        @keyframes wave { 0%, 100% { height: 4px; } 50% { height: 18px; } }
+        .hh-icon { display: inline-block; font-style: normal; }
       `}</style>
 
-      <div className="hh-topbar">
-        <div className="hh-brand">VoiceAndon</div>
-        <div className="hh-console">
-          Smart Factory Console
-          <span className="hh-auto">AUTO RUN</span>
-        </div>
-        <div className="hh-lamps" role="status" aria-label="Shop status">
-          <span className="hh-clock">{clock}</span>
-          <span className={alarmCount > 0 ? "hh-lamp hh-lamp-alarm" : "hh-lamp hh-lamp-ready"}>
-            {alarmCount > 0 ? `ALARM ×${alarmCount}` : "READY"}
-          </span>
-        </div>
-      </div>
-
-      <div className="hh-main">
-        <section className="hh-screen hh-screen-dark" aria-label={`${funcKey} screen`} aria-live="polite">
-          {funcKey === "F1" && (
-            <div>
-              <h2>F1 · OVERVIEW — 5 STATIONS (TAP A CARD)</h2>
-              <div className="hh-grid5">
-                {machines.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`hh-card hh-card-click${m.status === "alarm" ? " hh-alarm-frame" : ""}`}
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={selectedId === m.id}
-                    onClick={() => setSelectedId((prev) => (prev === m.id ? null : m.id))}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setSelectedId((prev) => (prev === m.id ? null : m.id));
-                      }
-                    }}
-                  >
-                    <div className="hh-row">
-                      <span className={lampClass(m.status)}>{lampText(m.status)}</span>
-                      <h3>{STATION_NAMES[m.id] ?? m.id}</h3>
-                    </div>
-                    <div className="hh-meta">{m.id} · {m.name}</div>
-                    <div className="hh-meta">{m.location}</div>
-                    <div className="hh-meta">
-                      Material left: {m.material_left}%{m.current_alarm ? ` · Alarm ${m.current_alarm}` : ""}
-                    </div>
-                    {m.current_alarm && (
-                      <div className="hh-meta">
-                        {alarmByCode(m.current_alarm)?.title ?? "Unknown alarm"}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              {selected ? (
-                <div className="hh-card" style={{ marginTop: 10 }}>
-                  <h3>
-                    {selected.id} · {selected.name} — {selected.status.toUpperCase()}
-                  </h3>
-                  <div className="hh-meta">{selected.location} · Material left {selected.material_left}%</div>
-                  {selectedAlarm ? (
-                    <div style={{ marginTop: 6 }}>
-                      <div className="hh-meta">
-                        Alarm {selectedAlarm.code} · {selectedAlarm.title} · severity {selectedAlarm.severity}
-                        {selectedAlarm.needs_technician ? " · needs technician" : ""}
-                      </div>
-                      <ol style={{ fontSize: 13, margin: "8px 0 0", paddingLeft: 18 }}>
-                        {selectedAlarm.first_checks.map((s) => (
-                          <li key={s}>{s}</li>
-                        ))}
-                      </ol>
-                    </div>
-                  ) : (
-                    <div className="hh-meta" style={{ marginTop: 6 }}>
-                      No active alarm on this station (demo data).
-                    </div>
-                  )}
-                  {selectedJobs.length > 0 && (
-                    <div className="hh-meta" style={{ marginTop: 6 }}>
-                      Latest care: {selectedJobs.map((r) => `${r.date} ${r.item} (${r.technician})`).join(" · ")}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="hh-meta" style={{ marginTop: 8 }}>
-                  Tap a station card to see its alarm detail and latest care (from demo data).
-                </p>
-              )}
-              {alarm414 && (
-                <div className="hh-card" style={{ marginTop: 10 }}>
-                  <h3>Alarm 414 · {alarm414.title}</h3>
-                  <div className="hh-meta">{alarm414.likely_causes}</div>
-                  <ol style={{ fontSize: 13, margin: "8px 0 0", paddingLeft: 18 }}>
-                    {alarm414.first_checks.map((s) => (
-                      <li key={s}>{s}</li>
-                    ))}
-                  </ol>
-                </div>
-              )}
-              <div className="hh-midrow">
-                <div className="hh-card">
-                  <h3>Servo monitor · J1–J3 (demo figures{jointTick ? ` · ${jointTick}` : ""})</h3>
-                  {servoJoints.map((j) => (
-                    <div key={j.joint} className="hh-row" style={{ marginTop: 4 }}>
-                      <span className="hh-meta" style={{ width: 28 }}>{j.joint}</span>
-                      <span className={j.load >= 70 ? "hh-low" : "hh-ok"}>Load {j.load.toFixed(1)}%</span>
-                      <span className={j.temp >= 60 ? "hh-low" : ""} style={{ color: j.temp >= 60 ? undefined : "#aeb9c4" }}>
-                        {j.temp.toFixed(1)}°C
-                      </span>
-                    </div>
-                  ))}
-                  <div className="hh-meta" style={{ marginTop: 6 }}>
-                    Local random-walk preview — not sensor readings.
-                  </div>
-                </div>
-                <div className="hh-card">
-                  <h3>AI summary · CLOSED-LOOP (demo)</h3>
-                  <div className="hh-meta">
-                    {alarmMachine
-                      ? `Open alarm on ${alarmMachine.id} (${alarmMachine.current_alarm ?? "—"}). Suggested loop: acknowledge → first checks → confirm → ticket.`
-                      : "No open alarms. Loop closed: all 5 stations reporting normal (demo data)."}
-                  </div>
-                  <div className="hh-meta" style={{ marginTop: 4 }}>
-                    Low stock stations: {lowStations.length === 0 ? "none" : lowStations.map((m) => m.id).join(", ")} (demo).
-                  </div>
-                </div>
-              </div>
+      <header className="bg-[#202731] text-white px-6 py-2.5 flex justify-between items-center border-b-2 border-[#12161c] shadow-md">
+        <div className="flex items-center space-x-4">
+          <div className="bg-[#0056b3] text-white font-black text-sm px-3 py-1 tracking-wider uppercase rounded-sm border border-blue-400">
+            CNC-640
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-base tracking-wide">
+                SMART FACTORY SYSTEM · 智慧工廠總控系統
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded bg-emerald-900/80 text-emerald-300 font-mono font-semibold border border-emerald-600">
+                AUTO RUN
+              </span>
             </div>
-          )}
-
-          {funcKey === "F2" && (
-            <div>
-              <h2>F2 · TRANSPORT — 4 AGVs (TAP DISPATCH · DEMO ONLY)</h2>
-              <div className="hh-grid5">
-                {agvs.map((a) => (
-                  <div key={a.id} className="hh-card">
-                    <div className="hh-row">
-                      <span className={a.status === "enroute" ? "hh-lamp hh-lamp-ready" : a.status === "charging" ? "hh-lamp hh-lamp-stopped" : "hh-lamp"}>
-                        {a.status === "enroute" ? "ENROUTE" : a.status === "charging" ? "CHARGING" : "IDLE"}
-                      </span>
-                      <h3>{a.id}</h3>
-                    </div>
-                    <div className="hh-meta">{a.route}</div>
-                    <div className="hh-meta">Battery {a.battery}% (demo figure)</div>
-                    <div className="hh-meta">{a.task}</div>
-                    {a.status === "idle" ? (
-                      <button type="button" className="hh-mini" onClick={() => dispatchAgv(a.id)}>
-                        Dispatch {a.id} → M04
-                      </button>
-                    ) : a.status === "enroute" ? (
-                      <button type="button" className="hh-mini hh-mini-ghost" onClick={() => recallAgv(a.id)}>
-                        Recall {a.id}
-                      </button>
-                    ) : (
-                      <button type="button" className="hh-mini" disabled>
-                        Charging… (demo)
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <p className="hh-meta" style={{ marginTop: 8 }}>
-                {agvMsg} Enroute now: {dispatchedCount} / 4. Positions are a static demo illustration, not live vehicle data; nothing here drives a real vehicle.
-              </p>
+            <div className="text-[11px] text-slate-400 font-mono flex items-center gap-3">
+              <span>MODE: FULL AUTONOMOUS</span>
+              <span>•</span>
+              <span>VIEW: {TAB_NAMES[view]}</span>
             </div>
-          )}
-
-          {funcKey === "F3" && (
-            <div>
-              <h2>F3 · ARM J1–J6 — LOAD / TEMP (LIVE DEMO TICK{jointTick ? ` · UPDATED ${jointTick}` : ""})</h2>
-              <table className="hh-table">
-                <thead>
-                  <tr>
-                    <th>Joint</th>
-                    <th>Load %</th>
-                    <th>Temp °C</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {joints.map((j) => (
-                    <tr key={j.joint}>
-                      <td>{j.joint} · DEMO-ARM-01</td>
-                      <td className={j.load >= 70 ? "hh-low" : ""}>{j.load.toFixed(1)}</td>
-                      <td className={j.temp >= 60 ? "hh-low" : ""}>{j.temp.toFixed(1)}</td>
-                      <td className={j.load >= 70 || j.temp >= 60 ? "hh-low" : "hh-ok"}>
-                        {j.load >= 70 || j.temp >= 60 ? "HIGH (demo)" : "normal (demo)"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="hh-meta" style={{ marginTop: 8 }}>
-                Numbers tick every 1.5 s from a local random walk for the console layout only — not sensor readings, not connected to any machine.
-              </p>
-            </div>
-          )}
-
-          {funcKey === "F4" && (
-            <div>
-              <h2>F4 · STOCK — S45C ROUND BAR (FROM DEMO DATA · &lt;50 IN RED)</h2>
-              <table className="hh-table">
-                <thead>
-                  <tr>
-                    <th>Station</th>
-                    <th>S45C left</th>
-                    <th>Note</th>
-                    <th>Urge</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {machines.map((m) => {
-                    const low = m.material_left < 50;
-                    return (
-                      <tr key={m.id}>
-                        <td>{m.id} · {m.name}</td>
-                        <td className={low ? "hh-low" : ""}>
-                          {m.material_left}%{low ? " ▼ LOW" : ""}
-                        </td>
-                        <td className={low ? "hh-low" : ""}>
-                          {m.material_left === 0 ? "Empty — refill demo queue" : low ? "Below 50 — urge material (demo)" : "OK (demo)"}
-                        </td>
-                        <td>
-                          {low ? (
-                            urged[m.id] ? (
-                              <span className="hh-ok">PO-DEMO-{m.id} sent {urged[m.id]} (demo)</span>
-                            ) : (
-                              <button type="button" className="hh-mini" onClick={() => urgeOne(m.id)}>
-                                Urge {m.id}
-                              </button>
-                            )
-                          ) : (
-                            <span className="hh-meta">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              <div className="hh-row" style={{ marginTop: 10 }}>
-                <button type="button" className="hh-mini" onClick={urgeAllLow} disabled={lowStations.length === 0}>
-                  {lowStations.length === 0 ? "Nothing below 50 (demo)" : `Urge all ${lowStations.length} low stations at once`}
-                </button>
-                <span className="hh-meta">One tap marks every station below 50 as urged (local flag only, nothing is ordered).</span>
-              </div>
-            </div>
-          )}
-
-          {funcKey === "F5" && (
-            <div>
-              <h2>F5 · CONTACTS — SHOP TECHNICIANS (FICTIONAL · DEMO TICKETS / POs)</h2>
-              <div className="hh-grid5">
-                {technicians.map((t, i) => (
-                  <div key={t} className="hh-card">
-                    <h3>{t} (demo)</h3>
-                    <div className="hh-meta">Maintenance · ext. 8{t.length}0{t.length} (demo)</div>
-                    <div className="hh-meta">
-                      Latest job: {maintenanceRecords.find((r) => r.technician === t)?.item ?? "—"}
-                    </div>
-                    <div className="hh-meta">Open ticket: {DEMO_TICKETS[i % DEMO_TICKETS.length]} (demo)</div>
-                    <div className="hh-meta">Last PO: {DEMO_POS[i % DEMO_POS.length]} (demo)</div>
-                  </div>
-                ))}
-              </div>
-              {otherAlarms.length > 0 && (
-                <div className="hh-card" style={{ marginTop: 10 }}>
-                  <h3>Call a technician for (demo table)</h3>
-                  <div className="hh-meta">
-                    {otherAlarms
-                      .filter((a) => a.needs_technician)
-                      .map((a) => `${a.code} ${a.title}`)
-                      .join(" · ") || "No technician-required demo alarms in this shortlist."}
-                  </div>
-                  <div className="hh-meta" style={{ marginTop: 4 }}>
-                    Escalation demo trail: {DEMO_TICKETS[0]} → {DEMO_POS[0]} → on-site visit (all demo numbers, no real order).
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {funcKey === "F6" && (
-            <div>
-              <h2>F6 · MUTE / RESET — BACK TO GREEN (CONSOLE ONLY)</h2>
-              <div className="hh-grid5">
-                <div className="hh-card">
-                  <div className="hh-row">
-                    <span className={muted ? "hh-lamp hh-lamp-stopped" : "hh-lamp hh-lamp-ready"}>
-                      {muted ? "MUTED" : "GREEN · ON"}
-                    </span>
-                    <h3>Console sound</h3>
-                  </div>
-                  <div className="hh-meta">Mute only affects this page preview, not /operator.</div>
-                  <button
-                    type="button"
-                    className="hh-softkey"
-                    style={{ marginTop: 8, minHeight: 0 }}
-                    aria-pressed={muted}
-                    onClick={() => setMuted((v) => !v)}
-                  >
-                    <strong>{muted ? "Unmute" : "Mute"}</strong>
-                    <small>toggle preview sound flag</small>
-                  </button>
-                </div>
-                <div className="hh-card">
-                  <div className="hh-row">
-                    <span className="hh-lamp hh-lamp-ready">GREEN</span>
-                    <h3>Reset preview</h3>
-                  </div>
-                  <div className="hh-meta">Clears voice line, AGV dispatches, urge flags and selection on this page only. Repair tickets on /dashboard are untouched. Real station states stay as in F1.</div>
-                  <button
-                    type="button"
-                    className="hh-softkey"
-                    style={{ marginTop: 8, minHeight: 0 }}
-                    onClick={resetConsole}
-                  >
-                    <strong>Reset — back to green</strong>
-                    <small>clear this page preview</small>
-                  </button>
-                </div>
-              </div>
-              <p className="hh-meta" style={{ marginTop: 8 }}>{resetMsg}</p>
-            </div>
-          )}
-        </section>
-
-        <nav className="hh-fkeys" aria-label="Function keys">
-          {FUNC_KEYS.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              className="hh-softkey"
-              aria-pressed={funcKey === f.key}
-              onClick={() => setFuncKey(f.key)}
-            >
-              <strong>{f.key} · {f.label}</strong>
-              <small>{f.hint} — click or press {f.key}</small>
-            </button>
-          ))}
-        </nav>
-
-        <div className="hh-voice-wrap">
-          <div className="hh-voice-card" aria-label="Voice dispatch card">
-            <button
-              type="button"
-              className="hh-talk-round"
-              data-on={talking}
-              aria-label="Tap to talk (demo preview)"
-              aria-pressed={talking}
-              onClick={toggleTalk}
-            >
-              {talking ? "● TALKING… tap to stop" : "TAP TO TALK"}
-            </button>
-            <div className="hh-voice-state">{voiceState}</div>
-            <canvas ref={canvasRef} className="wave-bar" width={300} height={64} aria-label="Voice waveform preview" />
-            <div className="hh-voiceline" aria-live="polite">{muted ? "Console muted." : voiceLine}</div>
           </div>
         </div>
+        <div className="flex items-center gap-3 font-mono text-xs">
+          <div className="flex items-center gap-1.5 bg-[#14181f] px-3 py-1.5 rounded border border-slate-700">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-emerald-400 font-bold">READY</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-[#14181f] px-3 py-1.5 rounded border border-slate-700">
+            {alarmCount > 0 ? (
+              <>
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                <span className="text-rose-400 font-bold">ALARM (1)</span>
+              </>
+            ) : (
+              <>
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                <span className="text-emerald-400 font-bold">NORMAL (0)</span>
+              </>
+            )}
+          </div>
+          <div className="bg-black/60 px-3 py-1.5 rounded border border-slate-700 text-amber-300 font-bold text-sm tracking-wider">
+            {clock}
+          </div>
+        </div>
+      </header>
+
+      <div className="flex-1 flex flex-col lg:flex-row p-4 gap-4 max-w-[1720px] w-full mx-auto">
+        <div className="flex-1 space-y-4">
+          {view === "f1" && (
+            <div className="space-y-4">
+              <section className="hh-card rounded-lg p-4">
+                <div className="flex justify-between items-center pb-2 mb-3 border-b border-[#9aa3b4]">
+                  <h2 className="text-sm font-bold flex items-center gap-2 text-[#202731]">
+                    <span className="hh-icon text-[#0056b3]" aria-hidden="true">◆</span>
+                    自動化製程全節點即時監控
+                  </h2>
+                  <span className="text-xs font-mono font-semibold text-slate-600">
+                    STATIONS: 5 ACTIVE
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-3 font-sans">
+                  <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col justify-between">
+                    <div className="flex justify-between text-[11px] font-mono font-bold">
+                      <span>01 碼頭進貨</span>
+                      <span className="text-emerald-700">● 正常</span>
+                    </div>
+                    <div className="my-3 text-center">
+                      <div className="text-xs font-bold">卡車到貨卸料</div>
+                      <div className="text-[10px] text-slate-500">批號 #TK-882</div>
+                    </div>
+                    <div className="text-[10px] p-1.5 rounded bg-slate-100 border text-center font-mono">
+                      進貨驗收完成 · {stationOf("M01")?.id} {stationOf("M01")?.status} · 料 {stationOf("M01")?.material_left}%
+                    </div>
+                  </div>
+                  <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col justify-between">
+                    <div className="flex justify-between text-[11px] font-mono font-bold">
+                      <span>02 下料 AGV</span>
+                      <span className="text-blue-700">● 搬運中</span>
+                    </div>
+                    <div className="my-3 text-center">
+                      <div className="text-xs font-bold">下料入庫登記</div>
+                      <div className="text-[10px] text-slate-500">品名/數量/材質/廠商</div>
+                    </div>
+                    <div className="text-[10px] p-1.5 rounded bg-slate-100 border text-center font-mono">
+                      WMS 自動寫入 · {stationOf("M02")?.id} 料 {stationOf("M02")?.material_left}%
+                    </div>
+                  </div>
+                  <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col justify-between">
+                    <div className="flex justify-between text-[11px] font-mono font-bold">
+                      <span>03 取料 AGV</span>
+                      <span className="text-amber-700">● 待命中</span>
+                    </div>
+                    <div className="my-3 text-center">
+                      <div className="text-xs font-bold">補料出庫調度</div>
+                      <div className="text-[10px] text-slate-500">支援語音/缺料觸發</div>
+                    </div>
+                    <div className="text-[10px] p-1.5 rounded bg-slate-100 border text-center font-mono">
+                      排程調度中 · {stationOf("M04")?.id} {stationOf("M04")?.status}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded flex flex-col justify-between bg-rose-50 border-2 border-rose-600 shadow-sm">
+                    <div className="flex justify-between text-[11px] font-mono font-bold text-rose-800">
+                      <span>04 手臂加工區</span>
+                      <span className="animate-pulse font-black">● 警報</span>
+                    </div>
+                    <div className="my-3 text-center">
+                      <div className="text-xs font-black text-rose-900">
+                        2號手臂：{alarmMachine?.current_alarm ?? "414"}
+                      </div>
+                      <div className="text-[10px] text-rose-700">物料區 → 自檢 → 成品區</div>
+                    </div>
+                    <div className="text-[10px] p-1.5 rounded bg-rose-100 border border-rose-300 text-center font-mono font-bold text-rose-900">
+                      {alarmMachine?.id ?? "M03"} · {alarm414?.title ?? ""} · 料 {stockMachine?.material_left ?? "-"}%
+                    </div>
+                  </div>
+                  <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col justify-between">
+                    <div className="flex justify-between text-[11px] font-mono font-bold">
+                      <span>05 品檢入庫</span>
+                      <span className="text-emerald-700">● 正常</span>
+                    </div>
+                    <div className="my-3 text-center">
+                      <div className="text-xs font-bold">視覺品檢自檢</div>
+                      <div className="text-[10px] text-slate-500">良率 99.4%</div>
+                    </div>
+                    <div className="text-[10px] p-1.5 rounded bg-slate-100 border text-center font-mono">
+                      自動入庫立體倉 · {stationOf("M05")?.id} {stationOf("M05")?.status}
+                    </div>
+                  </div>
+                </div>
+              </section>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <section className="hh-card rounded-lg p-4 font-mono text-xs space-y-2">
+                  <div className="font-bold border-b border-[#9aa3b4] pb-1 flex justify-between">
+                    <span>伺服軸即時監控 (ROBOT-02)</span>
+                    <span className="text-rose-600 font-bold">
+                      {alarmMachine?.current_alarm ?? "414"} 警報中
+                    </span>
+                  </div>
+                  <div className="flex justify-between p-1.5 bg-white rounded border">
+                    <span>J1 BASE:</span>
+                    <span>+124.500 mm (32%)</span>
+                  </div>
+                  <div className="flex justify-between p-1.5 bg-rose-100 rounded border border-rose-400 font-bold text-rose-900">
+                    <span>J2 SHOULDER:</span>
+                    <span>-48.210 mm (142% 超載)</span>
+                  </div>
+                  <div className="flex justify-between p-1.5 bg-white rounded border">
+                    <span>J3 ELBOW:</span>
+                    <span>+982.015 mm (28%)</span>
+                  </div>
+                  {alarm414 && (
+                    <div className="p-1.5 bg-white rounded border text-[11px] font-sans text-slate-700">
+                      對應假資料警報 {alarm414.code}：{alarm414.title}。{alarm414.first_checks[0]}
+                    </div>
+                  )}
+                </section>
+                <section className="hh-card rounded-lg p-4 text-xs font-sans space-y-2">
+                  <div className="font-bold border-b border-[#9aa3b4] pb-1 flex justify-between">
+                    <span>AI 大腦最新自主行動摘要</span>
+                    <span className="text-emerald-700 font-mono font-bold">CLOSED-LOOP</span>
+                  </div>
+                  <div className="p-2 bg-white rounded border border-slate-300">
+                    <div className="text-rose-700 font-bold text-[11px]">
+                      ● 已致電原廠報修 (13:10:15)
+                    </div>
+                    <div className="text-[11px] text-slate-700 mt-0.5">
+                      預約工程師今日 15:00 到廠排查 J2 軸卡料。
+                    </div>
+                  </div>
+                  <div className="p-2 bg-white rounded border border-slate-300">
+                    <div className="text-amber-800 font-bold text-[11px]">
+                      ● 已致電材料供應商 (12:45:00)
+                    </div>
+                    <div className="text-[11px] text-slate-700 mt-0.5">
+                      S45C 鋼材庫存偏低（{stockMachine?.id} 剩 {stockMachine?.material_left} 支，警戒線 {STOCK_LOW_LINE}），自動叫料 200 支，明日 09:00 前送達。
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          )}
+
+          {view === "f2" && (
+            <div className="hh-card rounded-lg p-5 space-y-4">
+              <div className="flex justify-between items-center border-b border-[#9aa3b4] pb-2">
+                <h2 className="text-base font-bold text-[#202731] flex items-center gap-2">
+                  <span className="hh-icon text-[#0056b3]" aria-hidden="true">◆</span>
+                  AGV 車隊手動即時調度中心
+                </h2>
+                <span className="text-xs font-mono text-slate-600">FLEET: 4 UNITS ACTIVE</span>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                <div className="lg:col-span-7 bg-slate-900 rounded-lg overflow-hidden border-2 border-slate-700 relative shadow-inner">
+                  <div className="absolute top-2 left-3 z-10 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping" />
+                    <span className="font-mono text-xs font-bold text-white bg-black/60 px-2 py-0.5 rounded">
+                      ● CAM-01: AGV-02 導航前視鏡頭 [LIVE]
+                    </span>
+                  </div>
+                  <div className="absolute top-2 right-3 z-10 font-mono text-[11px] text-emerald-400 bg-black/60 px-2 py-0.5 rounded">
+                    30 FPS • 1080P • LiDAR ON
+                  </div>
+                  <div className="h-64 sm:h-72 w-full bg-gradient-to-b from-slate-950 via-slate-800 to-slate-900 flex flex-col justify-between p-4 relative cam-overlay">
+                    <div className="mt-6 flex justify-between text-[11px] font-mono text-cyan-400">
+                      <div>SPEED: 1.2 m/s<br />STEER: +0.2°</div>
+                      <div className="text-right">ZONE: BAY-C<br />OBSTACLE: CLEAR</div>
+                    </div>
+                    <div className="relative w-full h-24 flex items-center justify-center">
+                      <div className="w-48 h-full border-b-4 border-l-2 border-r-2 border-cyan-400/50 rounded-b-3xl" />
+                      <div className="absolute text-[10px] font-mono text-cyan-300 bg-cyan-950/80 px-2 py-0.5 border border-cyan-500 rounded">
+                        路徑鎖定：➔ 1號手臂備料區 (7.4m)
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] font-mono text-slate-400">
+                      <span>RCS_SYNC: OK (4ms)</span>
+                      <span>BATTERY: 95%</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="lg:col-span-5 space-y-3">
+                  <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold font-mono text-xs">AGV-01 (下料搬運車)</span>
+                      <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold">運行中</span>
+                    </div>
+                    <div className="text-[11px] text-slate-600">碼頭卸貨 ➜ WMS 立體庫 (電量 88%)</div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => dispatchAgv("AGV-01", "返回碼頭")}
+                        className="flex-1 py-1.5 bg-slate-200 hover:bg-slate-300 rounded text-xs font-bold"
+                      >
+                        調回碼頭
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => dispatchAgv("AGV-01", "前往充電樁")}
+                        className="py-1.5 px-3 bg-slate-200 hover:bg-slate-300 rounded text-xs font-bold"
+                      >
+                        回充
+                      </button>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold font-mono text-xs">AGV-02 (補料出庫車)</span>
+                      <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">視訊連線中</span>
+                    </div>
+                    <div className="text-[11px] text-slate-600">立體倉出料口待命位 (電量 95%)</div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => dispatchAgv("AGV-02", "送料至 1 號手臂")}
+                        className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold"
+                      >
+                        補料至 1 號手臂
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => dispatchAgv("AGV-02", "送料至 2 號手臂")}
+                        className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold"
+                      >
+                        補料至 2 號手臂
+                      </button>
+                    </div>
+                  </div>
+                  {agvMsg && (
+                    <div className="p-2 bg-emerald-50 border border-emerald-300 rounded text-xs font-mono text-emerald-800">
+                      {agvMsg}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {view === "f3" && (
+            <div className="hh-card rounded-lg p-5 space-y-4">
+              <div className="flex justify-between items-center border-b border-[#9aa3b4] pb-2">
+                <h2 className="text-base font-bold text-[#202731] flex items-center gap-2">
+                  <span className="hh-icon text-[#0056b3]" aria-hidden="true">◆</span>
+                  六軸機械手臂精細數據與扭矩頻譜分析 (ROBOT-02)
+                </h2>
+                <span className="text-xs font-mono font-bold text-rose-700 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded">
+                  {alarmMachine?.current_alarm ?? "414"} OVER-TORQUE
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 font-mono">
+                <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-800">J1 底座旋轉軸 (BASE)</span>
+                    <span className="font-bold text-emerald-700">32%</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                    <div className="bg-emerald-600 h-full rounded-full" style={{ width: "32%" }} />
+                  </div>
+                  <div className="grid grid-cols-3 text-[10px] text-slate-600 pt-1 border-t border-slate-200">
+                    <div>角度: +124.5°</div><div>轉速: 120 RPM</div><div>電流: 4.2 A</div><div>溫度: 42°C</div><div>振動: 0.8 mm/s</div><div className="text-emerald-700 font-bold">狀態: 正常</div>
+                  </div>
+                </div>
+                <div className="p-3 bg-rose-50 border-2 border-rose-500 rounded space-y-2 shadow-sm">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-black text-rose-900">J2 大臂俯仰軸 (SHOULDER)</span>
+                    <span className="font-black text-rose-700 animate-pulse">142% [超標]</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                    <div className="bg-rose-600 h-full rounded-full" style={{ width: "100%" }} />
+                  </div>
+                  <div className="grid grid-cols-3 text-[10px] text-rose-900 pt-1 border-t border-rose-300 font-bold">
+                    <div>角度: -48.2°</div><div>轉速: 0 RPM</div><div className="text-rose-700">電流: 18.9 A</div><div>溫度: 78°C</div><div>振動: 4.6 mm/s</div><div className="text-rose-700">狀態: 卡死鎖定</div>
+                  </div>
+                </div>
+                <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-800">J3 小臂關節軸 (ELBOW)</span>
+                    <span className="font-bold text-emerald-700">28%</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                    <div className="bg-emerald-600 h-full rounded-full" style={{ width: "28%" }} />
+                  </div>
+                  <div className="grid grid-cols-3 text-[10px] text-slate-600 pt-1 border-t border-slate-200">
+                    <div>角度: +98.0°</div><div>轉速: 85 RPM</div><div>電流: 3.8 A</div><div>溫度: 39°C</div><div>振動: 0.6 mm/s</div><div className="text-emerald-700 font-bold">狀態: 正常</div>
+                  </div>
+                </div>
+                <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-800">J4 腕部旋轉軸 (WRIST 1)</span>
+                    <span className="font-bold text-emerald-700">15%</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                    <div className="bg-emerald-600 h-full rounded-full" style={{ width: "15%" }} />
+                  </div>
+                  <div className="grid grid-cols-3 text-[10px] text-slate-600 pt-1 border-t border-slate-200">
+                    <div>角度: +0.0°</div><div>轉速: 0 RPM</div><div>電流: 1.2 A</div><div>溫度: 35°C</div><div>振動: 0.2 mm/s</div><div className="text-emerald-700 font-bold">狀態: 正常</div>
+                  </div>
+                </div>
+                <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-800">J5 腕部俯仰軸 (WRIST 2)</span>
+                    <span className="font-bold text-emerald-700">18%</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                    <div className="bg-emerald-600 h-full rounded-full" style={{ width: "18%" }} />
+                  </div>
+                  <div className="grid grid-cols-3 text-[10px] text-slate-600 pt-1 border-t border-slate-200">
+                    <div>角度: -30.0°</div><div>轉速: 0 RPM</div><div>電流: 1.6 A</div><div>溫度: 36°C</div><div>振動: 0.3 mm/s</div><div className="text-emerald-700 font-bold">狀態: 正常</div>
+                  </div>
+                </div>
+                <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-800">J6 末端法蘭夾爪 (FLANGE)</span>
+                    <span className="font-bold text-emerald-700">10%</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                    <div className="bg-emerald-600 h-full rounded-full" style={{ width: "10%" }} />
+                  </div>
+                  <div className="grid grid-cols-3 text-[10px] text-slate-600 pt-1 border-t border-slate-200">
+                    <div>氣壓: 0.62 MPa</div><div>夾緊力: 150 N</div><div>電流: 0.9 A</div><div>開合行程: 45mm</div><div>磁簧感應: ON</div><div className="text-emerald-700 font-bold">狀態: 閉合保壓</div>
+                  </div>
+                </div>
+              </div>
+              <div className="p-3 bg-white rounded border border-slate-300 text-xs font-sans space-y-1">
+                <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                  機台專家系統診斷與即時排除建議：
+                </div>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  J2 軸伺服扭矩於 13:10:02 發生階躍型過載（峰值達 142% 額定扭矩），系統已觸發硬體煞車安全連鎖。AI 研判內部減速機或導軌異物卡阻，已完成原廠緊急報修，工單單號：#TICKET-8902。
+                  {alarm414 && <>（對應假資料警報 {alarm414.code}：{alarm414.title}。）</>}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {view === "f4" && (
+            <div className="hh-card rounded-lg p-5 space-y-4">
+              <div className="flex justify-between items-center border-b border-[#9aa3b4] pb-2">
+                <h2 className="text-base font-bold text-[#202731] flex items-center gap-2">
+                  <span className="hh-icon text-[#0056b3]" aria-hidden="true">◆</span>
+                  立體倉原料庫存監控與 AI 自動叫料
+                </h2>
+                <span className="text-xs font-mono text-slate-600">ERP / WMS LIVE</span>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                <div className="lg:col-span-6 bg-slate-900 rounded-lg overflow-hidden border-2 border-slate-700 relative shadow-inner">
+                  <div className="absolute top-2 left-3 z-10 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping" />
+                    <span className="font-mono text-xs font-bold text-white bg-black/60 px-2 py-0.5 rounded">
+                      ● CAM-02: 原料立體倉 03 貨架全景 [LIVE]
+                    </span>
+                  </div>
+                  <div className="absolute top-2 right-3 z-10 font-mono text-[11px] text-amber-400 bg-black/60 px-2 py-0.5 rounded">
+                    AI 物體辨識：低於安全庫存
+                  </div>
+                  <div className="h-60 w-full bg-gradient-to-b from-slate-950 via-slate-800 to-slate-900 flex flex-col justify-between p-4 relative cam-overlay">
+                    <div className="mt-6 flex justify-between text-[11px] font-mono text-slate-300">
+                      <div>RACK: B-03-A<br />CAPACITY: 42%</div>
+                      <div className="text-right">TEMP: 22.4°C<br />HUMID: 48%</div>
+                    </div>
+                    <div className="w-44 h-24 mx-auto border-2 border-dashed border-amber-400 bg-amber-500/10 rounded flex flex-col items-center justify-center text-center p-1">
+                      <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-950/80 px-1 rounded">MAT-S45C-50</span>
+                      <span className="text-[10px] text-rose-400 font-bold mt-1">
+                        ▲ 剩餘 {stockMachine?.material_left ?? "-"} 支 (警戒線 {STOCK_LOW_LINE})
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] font-mono text-slate-400">
+                      <span>SENSOR: RFID / OPTICAL ON</span>
+                      <span>WMS_STABLE</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="lg:col-span-6 space-y-3">
+                  <table className="w-full text-xs text-left bg-white rounded border border-slate-300">
+                    <thead className="bg-slate-100 border-b font-mono">
+                      <tr>
+                        <th className="p-2">料號 / 品名</th>
+                        <th className="p-2">庫存</th>
+                        <th className="p-2">下限</th>
+                        <th className="p-2 text-right">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y text-slate-700">
+                      <tr className="bg-amber-50">
+                        <td className="p-2 font-bold font-mono">S45C 圓棒材 Ø50（{stockMachine?.id} 假資料）</td>
+                        <td className="p-2 font-bold text-rose-700">{stockMachine?.material_left} 支</td>
+                        <td className="p-2 font-mono">{STOCK_LOW_LINE} 支</td>
+                        <td className="p-2 text-right">
+                          <button
+                            type="button"
+                            onClick={() => callSupplierManual("S45C 圓棒材")}
+                            className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[10px] font-bold"
+                          >
+                            催料通話
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 font-mono">AL6061 方棒 30x30</td>
+                        <td className="p-2 font-bold text-emerald-700">180 支</td>
+                        <td className="p-2 font-mono">60 支</td>
+                        <td className="p-2 text-right text-slate-400">-</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 font-mono">SUS304 棒材 Ø20</td>
+                        <td className="p-2 font-bold text-emerald-700">92 支</td>
+                        <td className="p-2 font-mono">40 支</td>
+                        <td className="p-2 text-right text-slate-400">-</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  {supplierMsg && (
+                    <div className="p-2 bg-blue-50 border border-blue-300 rounded text-xs font-mono text-blue-800">
+                      {supplierMsg}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {view === "f5" && (
+            <div className="hh-card rounded-lg p-5 space-y-4">
+              <div className="flex justify-between items-center border-b border-[#9aa3b4] pb-2">
+                <h2 className="text-base font-bold text-[#202731] flex items-center gap-2">
+                  <span className="hh-icon text-[#0056b3]" aria-hidden="true">◆</span>
+                  AI 外部語音通話與採購報修紀錄明細
+                </h2>
+                <span className="text-xs font-mono text-slate-600">OUTBOUND AI LOG</span>
+              </div>
+              <div className="space-y-3 text-xs">
+                <div className="p-3 bg-white rounded border space-y-2">
+                  <div className="flex justify-between font-mono">
+                    <span className="font-bold text-rose-700">● 機械手臂原廠緊急維修窗口 (通話 52 秒)</span>
+                    <span className="text-slate-500">2026-09-19 13:10:15</span>
+                  </div>
+                  <div className="p-2 bg-slate-50 border rounded text-[11px] leading-relaxed">
+                    AI:「2號手臂發生 {alarmMachine?.current_alarm ?? "414"} 警報（{alarm414?.title ?? ""}），現場無障礙物，判定內部卡料需工程師到廠。」<br />
+                    原廠:「工單已成立，已指派工程師攜帶備品，預計 15:00 前抵達。」
+                  </div>
+                  <div className="text-[11px] text-emerald-700 font-bold">工單編號：#TICKET-8902 (預約確認)</div>
+                </div>
+                <div className="p-3 bg-white rounded border space-y-2">
+                  <div className="flex justify-between font-mono">
+                    <span className="font-bold text-amber-800">● 晉茂鋼鐵業務窗口 (通話 38 秒)</span>
+                    <span className="text-slate-500">2026-09-19 12:45:00</span>
+                  </div>
+                  <div className="p-2 bg-slate-50 border rounded text-[11px] leading-relaxed">
+                    AI:「李經理，S45C Ø50 圓棒庫存已跌破安全線（剩 {stockMachine?.material_left} 支），請依協議緊急配送 200 支。」<br />
+                    供應商:「有現貨，已排明日第一班車送達。」
+                  </div>
+                  <div className="text-[11px] text-emerald-700 font-bold">EDI 採購單：#PO-20260919-01 (已出單)</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <aside className="w-full lg:w-72 flex flex-col gap-3">
+          <div className="flex flex-col gap-2" role="tablist" aria-label="Function keys">
+            {(
+              [
+                { key: "f1", label: "F1: 流程監控總覽" },
+                { key: "f2", label: "F2: AGV 車隊手動調度" },
+                { key: "f3", label: "F3: 手臂軸向數據分析" },
+                { key: "f4", label: "F4: 原料庫存與補叫料" },
+                { key: "f5", label: "F5: AI 外部通訊錄明細" },
+              ] as { key: ViewKey; label: string }[]
+            ).map((b) => (
+              <button
+                key={b.key}
+                type="button"
+                role="tab"
+                aria-selected={view === b.key}
+                onClick={() => switchTab(b.key)}
+                className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold flex justify-between items-center shadow-sm${view === b.key ? " active" : ""}`}
+              >
+                <span className="font-mono text-sm">{b.label}</span>
+                <span className="hh-icon text-slate-500" aria-hidden="true">▶</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={resetAlarm}
+              className="py-3 px-3.5 rounded-lg text-left text-xs font-bold bg-[#b71c1c] hover:bg-[#c62828] text-white border border-[#7f0000] shadow-md flex justify-between items-center transition"
+            >
+              <span className="font-mono text-sm font-bold">F6: 警報靜音 / 重置</span>
+              <span className="hh-icon text-rose-200" aria-hidden="true">●</span>
+            </button>
+          </div>
+          <div className="hh-card rounded-lg p-3 text-center flex flex-col items-center mt-auto border-2 border-slate-400">
+            <div className="w-full text-left pb-1 mb-1 border-b border-[#9aa3b4] flex justify-between items-center">
+              <span className="text-xs font-bold text-[#202731] flex items-center gap-1">
+                <span className="hh-icon text-[#0056b3]" aria-hidden="true">●</span> 語音調度
+              </span>
+              <div className={`${recording ? "flex" : "hidden"} items-center gap-1`} aria-hidden={!recording}>
+                <span className="wave-bar" />
+                <span className="wave-bar" />
+                <span className="wave-bar" />
+                <span className="wave-bar" />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={toggleVoiceRecording}
+              aria-pressed={recording}
+              className={`w-20 h-20 my-2 rounded-full hh-softkey flex flex-col items-center justify-center border-2 border-[#596579] active:scale-95 shadow-md transition${recording ? " border-rose-500 bg-rose-100" : ""}`}
+            >
+              <span className={`hh-icon text-2xl ${recording ? "text-rose-600" : "text-[#0056b3]"}`} aria-hidden="true">●</span>
+              <span className={`text-[10px] font-bold mt-1 ${recording ? "text-rose-800" : "text-slate-800"}`}>
+                {recording ? "停止辨識" : "點擊說話"}
+              </span>
+            </button>
+            <div className={`text-[11px] font-mono font-bold ${voiceStatusHot ? "text-rose-600 animate-pulse" : recording ? "text-rose-600" : "text-slate-600"}`}>
+              {voiceStatus}
+            </div>
+            <label className="w-full mt-2 text-left">
+              <span className="text-[10px] font-mono text-slate-500">語音語言（18 語 mock 示意）：</span>
+              <select
+                value={voiceLang}
+                onChange={(e) => setVoiceLang(e.target.value)}
+                className="mt-0.5 w-full text-xs border border-slate-400 rounded px-1 py-1 bg-white text-slate-800"
+              >
+                {VOICE_LANGS.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.label} ({l.code})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="w-full mt-2 text-left">
+              <div className="text-[10px] font-mono text-slate-500 mb-0.5">剛剛說話內容紀錄 (TRANSCRIPT)：</div>
+              <div className="w-full min-h-[48px] p-2 bg-white rounded border border-slate-400 text-xs font-sans text-slate-800 leading-snug">
+                {speechText}
+              </div>
+              <div className="text-[10px] font-mono text-slate-500 mt-1 mb-0.5">MOCK 意圖 (INTENT)：</div>
+              <div className="w-full min-h-[28px] p-2 bg-white rounded border border-slate-400 text-[11px] font-mono text-slate-700 leading-snug">
+                {intentLine}
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
 
-      <div className="hh-statusbar" role="status" aria-label="Console status">
-        <span className={alarmCount > 0 ? "hh-lamp hh-lamp-alarm" : "hh-lamp hh-lamp-ready"}>
-          {alarmCount > 0 ? `STATUS · ALARM ×${alarmCount}` : "STATUS · READY"}
-        </span>
-        <span>{alarmMachine ? `${alarmMachine.id} / alarm ${alarmMachine.current_alarm ?? "—"} (demo)` : "All stations normal (demo)"}</span>
-        <span className="hh-clock">{clock}</span>
-      </div>
-
-      <div className="hh-links">
-        <Link href="/operator">Try the demo (/operator)</Link>
-        <Link href="/dashboard">Supervisor board (/dashboard)</Link>
-        <Link href="/pitch">Pitch (/pitch)</Link>
-      </div>
-      <p className="hh-note">
-        All machines, alarm codes, maintenance records, AGV / arm figures, stock levels, names, ticket numbers
-        ({DEMO_TICKETS.join(", ")}) and PO numbers ({DEMO_POS.join(", ")}) on this console are fictional sample data written
-        for this project — not from any manufacturer manual, and describing no real machine, brand or company.
-        Voice wiring on /operator is owned by the voice line; this page changes no voice logic.
-      </p>
+      <footer className="bg-[#202731] text-slate-400 text-xs px-6 py-2 flex justify-between items-center border-t border-slate-700 font-mono">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+          <span className="text-slate-200 font-bold">STATUS:</span>
+          <span>ALL SENSORS SYNCHRONIZED. VIDEO PIPELINE CONNECTED.</span>
+        </div>
+        <div className="flex items-center gap-4 text-[11px]">
+          <Link href="/operator" className="underline">/operator</Link>
+          <Link href="/dashboard" className="underline">/dashboard</Link>
+          <Link href="/pitch" className="underline">/pitch</Link>
+          <span>SYNC: 100%</span>
+          <span>LATENCY: 8ms</span>
+        </div>
+      </footer>
     </main>
   );
 }
