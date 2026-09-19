@@ -555,7 +555,7 @@ export default function Home() {
                   <span className="font-bold text-rose-700">● 機械手臂原廠緊急維修窗口 (通話 52 秒)</span>
                   <span className="text-slate-500">2026-09-19 13:10:15</span>
                 </div>
-                <div className="p-2 bg-slate-50 border rounded text-[11px] leading-relaxed">
+                <div className="p-2 bg-slate-50 border rounded text-[11px] leading-relaxed text-slate-700">
                   AI:「2號手臂發生 E-402 伺服負載 142% 警報，現場無障礙物，判定內部卡料需工程師到廠。」<br />
                   原廠:「工單已成立，已指派工程師攜帶備品，預計 15:00 前抵達。」
                 </div>
@@ -566,7 +566,7 @@ export default function Home() {
                   <span className="font-bold text-amber-800">● 晉茂鋼鐵業務窗口 (通話 38 秒)</span>
                   <span className="text-slate-500">2026-09-19 12:45:00</span>
                 </div>
-                <div className="p-2 bg-slate-50 border rounded text-[11px] leading-relaxed">
+                <div className="p-2 bg-slate-50 border rounded text-[11px] leading-relaxed text-slate-700">
                   AI:「李經理，S45C Ø50 圓棒庫存已跌破安全線，請依協議緊急配送 200 支。」<br />
                   供應商:「有現貨，已排明日第一班車送達。」
                 </div>
@@ -578,23 +578,23 @@ export default function Home() {
 
         <aside className="w-full lg:w-72 flex flex-col gap-3">
           <div className="flex flex-col gap-2">
-            <button type="button" onClick={() => switchTab("f1")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold flex justify-between items-center shadow-sm${view === "f1" ? " active" : ""}`}>
+            <button type="button" onClick={() => switchTab("f1")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === "f1" ? " active" : ""}`}>
               <span className="font-mono text-sm">F1: 流程監控總覽</span>
               <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
             </button>
-            <button type="button" onClick={() => switchTab("f2")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold flex justify-between items-center shadow-sm${view === "f2" ? " active" : ""}`}>
+            <button type="button" onClick={() => switchTab("f2")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === "f2" ? " active" : ""}`}>
               <span className="font-mono text-sm">F2: AGV 車隊手動調度</span>
               <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
             </button>
-            <button type="button" onClick={() => switchTab("f3")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold flex justify-between items-center shadow-sm${view === "f3" ? " active" : ""}`}>
+            <button type="button" onClick={() => switchTab("f3")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === "f3" ? " active" : ""}`}>
               <span className="font-mono text-sm">F3: 手臂軸向數據分析</span>
               <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
             </button>
-            <button type="button" onClick={() => switchTab("f4")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold flex justify-between items-center shadow-sm${view === "f4" ? " active" : ""}`}>
+            <button type="button" onClick={() => switchTab("f4")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === "f4" ? " active" : ""}`}>
               <span className="font-mono text-sm">F4: 原料庫存與補叫料</span>
               <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
             </button>
-            <button type="button" onClick={() => switchTab("f5")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold flex justify-between items-center shadow-sm${view === "f5" ? " active" : ""}`}>
+            <button type="button" onClick={() => switchTab("f5")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === "f5" ? " active" : ""}`}>
               <span className="font-mono text-sm">F5: AI 外部通訊錄明細</span>
               <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
             </button>
