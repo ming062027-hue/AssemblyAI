@@ -1,7 +1,7 @@
 "use client";
 
 // 看板資料線：首頁＝車間控制台風格（自有樣式，不含任何第三方品牌字樣）。
-// - 外觀：冷灰底、高對比、hh-card / hh-softkey、自繪 READY / ALARM 燈、雙分屏＋右側 6 鍵、波形。
+// - 外觀：冷灰底、高對比、hh-card / hh-softkey、自繪 READY / ALARM 燈、雙分屏＋右側 6 鍵；語音調度（按住說話＋波形＋待命中）置於主排最底下全寬、不在側欄。
 // - F1–F6 可點、可按鍵盤 F1–F6 真切換；內容只用 src/data 現有 M01–M05 / 警報 / 保養（自編示範資料）。
 //   F2 AGV 4 台可點派車（本機狀態、不控制真車）；F3 J1–J6 負載/溫度每 1.5 秒本機跳動（示意、非感測值）；
 //   F4 S45C 庫存 <50 紅字＋一鍵催料鈕（本機旗標、未連線）；F5 通訊錄明細（虛構技師＋示範單號 #TICKET-8902 / #PO-DEMO-…）；
@@ -364,7 +364,7 @@ export default function Home() {
         .hh-mini { background: #2fbf5f; border: 2px solid #0b2b16; border-bottom-width: 4px; border-radius: 6px; font-weight: 700; font-size: 13px; padding: 6px 10px; cursor: pointer; color: #06130a; margin-top: 8px; }
         .hh-mini:disabled { background: #6b7280; border-color: #374151; color: #e5e7eb; cursor: not-allowed; }
         .hh-mini-ghost { background: #39414a; border-color: #14181c; color: #e8edf1; }
-        .hh-voicebar { background: #23282d; border-top: 4px solid #0f1113; padding: 10px 16px 14px; display: grid; grid-template-columns: 220px 1fr; gap: 12px; align-items: center; }
+        .hh-voicebar { background: #23282d; border: 3px solid #0f1113; border-radius: 8px; padding: 10px 16px 14px; display: grid; grid-template-columns: 220px 1fr; gap: 12px; align-items: center; grid-column: 1 / -1; }
         @media (max-width: 760px) { .hh-voicebar { grid-template-columns: 1fr; } }
         .hh-talk { background: #2fbf5f; border: 2px solid #0b2b16; border-bottom-width: 6px; border-radius: 10px; font-weight: 800; font-size: 16px; padding: 14px; cursor: pointer; color: #06130a; user-select: none; touch-action: none; }
         .hh-talk:active, .hh-talk[data-on="true"] { background: #e5484d; color: #fff; border-color: #4d0f12; }
@@ -686,27 +686,27 @@ export default function Home() {
             </button>
           ))}
         </nav>
-      </div>
 
-      <div className="hh-voicebar">
-        <div>
-          <button
-            type="button"
-            className="hh-talk"
-            data-on={talking}
-            aria-label="Hold to talk (demo preview)"
-            onMouseDown={startTalk}
-            onTouchStart={startTalk}
-            onMouseUp={stopTalk}
-            onMouseLeave={stopTalk}
-          >
-            {talking ? "● TALKING… release" : "HOLD TO TALK"}
-          </button>
-          <div className="hh-voiceline">{muted ? "Console muted." : talking ? "Recording preview…" : "Ready."}</div>
-        </div>
-        <div>
-          <canvas ref={canvasRef} className="hh-wave" width={640} height={84} aria-label="Voice waveform preview" />
-          <div className="hh-voiceline" aria-live="polite">{voiceLine}</div>
+        <div className="hh-voicebar">
+          <div>
+            <button
+              type="button"
+              className="hh-talk"
+              data-on={talking}
+              aria-label="Hold to talk (demo preview)"
+              onMouseDown={startTalk}
+              onTouchStart={startTalk}
+              onMouseUp={stopTalk}
+              onMouseLeave={stopTalk}
+            >
+              {talking ? "● TALKING… release" : "HOLD TO TALK"}
+            </button>
+            <div className="hh-voiceline">{muted ? "Console muted." : talking ? "Recording preview…" : "Ready."}</div>
+          </div>
+          <div>
+            <canvas ref={canvasRef} className="hh-wave" width={640} height={84} aria-label="Voice waveform preview" />
+            <div className="hh-voiceline" aria-live="polite">{voiceLine}</div>
+          </div>
         </div>
       </div>
 
