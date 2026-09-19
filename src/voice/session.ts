@@ -9,11 +9,17 @@ function buildSessionUpdate(systemPrompt: string, tools: object[]) {
       tools,
       input: {
         voice_focus: "far-field",
-        language_codes: ["en"],
+        // 多語：明確列出需要的三種（en/zh/pt），不鎖英文。
+        // 理由：不設 language_codes 是全自動偵測（18 種裡猜，吵雜現場易誤判）；
+        // 設成 ["en","zh","pt"] 只在這三種裡判斷，官方說會稍微準一點
+        //（見 交接/線_語音.md 結論④）。輸出仍只用英文（規格書 §1 #4：尚無中文聲音）。
+        language_codes: ["en", "zh", "pt"],
         keyterms: [
           "M01", "M02", "M03", "M04", "M05",
           "414", "1001",
-          "spindle", "coolant", "ATC", "servo"
+          "spindle", "coolant", "ATC", "servo",
+          "S45C", "E-402", "AGV", "PLC", "Fanuc", "J2軸",
+          "chuck", "turret"
         ],
         // turn_detection 必須放在 input 裡（2026-09-19 Claude 用真 API 實測：
         // 放在 session 底層會被打回 invalid_format；放進 input 後 session.ready 通過）。
