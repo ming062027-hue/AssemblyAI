@@ -7,7 +7,9 @@
 // - 不接 machines.json／alarms.json、不 POST /api/voice-stream、不加語言下拉與 INTENT 框、不加底部 M01 條與警報對應條。
 
 import Script from "next/script";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SITE_VERSION } from "@/config/site";
 
 declare global {
   interface Window {
@@ -110,58 +112,6 @@ export default function Home() {
         strategy="afterInteractive"
         onLoad={refreshIcons}
       />
-      <style>{`
-        :root {
-          --hh-bg: #c9d0db;
-          --hh-panel: #dce2ec;
-          --hh-border: #7e889b;
-          --hh-blue: #0056b3;
-          --hh-text: #14181f;
-        }
-        .hh-card {
-          background-color: var(--hh-panel);
-          border: 1.5px solid var(--hh-border);
-          box-shadow: inset 1px 1px 0px rgba(255,255,255,0.7), 2px 2px 5px rgba(0,0,0,0.08);
-        }
-        .hh-softkey {
-          background: linear-gradient(180deg, #eef2f7 0%, #cbd3e0 100%);
-          border: 1px solid #727c8d;
-          box-shadow: inset 1px 1px 0 rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.15);
-          transition: all 0.1s ease;
-        }
-        .hh-softkey:active {
-          background: linear-gradient(180deg, #b8c2d1 0%, #d8dfea 100%);
-          transform: translateY(1px);
-        }
-        .hh-softkey.active {
-          border: 2px solid #0056b3;
-          background: #e1ebf7;
-        }
-        .cam-overlay {
-          background: repeating-linear-gradient(
-            0deg,
-            rgba(0, 0, 0, 0.15),
-            rgba(0, 0, 0, 0.15) 1px,
-            transparent 1px,
-            transparent 2px
-          );
-        }
-        .wave-bar {
-          display: inline-block;
-          width: 3px;
-          height: 10px;
-          background-color: #0056b3;
-          border-radius: 2px;
-          animation: wave 1s ease-in-out infinite;
-        }
-        .wave-bar:nth-child(2) { animation-delay: 0.15s; }
-        .wave-bar:nth-child(3) { animation-delay: 0.3s; }
-        .wave-bar:nth-child(4) { animation-delay: 0.45s; }
-        @keyframes wave {
-          0%, 100% { height: 4px; }
-          50% { height: 18px; }
-        }
-      `}</style>
 
       <header className="bg-[#202731] text-white px-6 py-2.5 flex justify-between items-center border-b-2 border-[#12161c] shadow-md">
         <div className="flex items-center space-x-4">
@@ -205,6 +155,28 @@ export default function Home() {
           </div>
         </div>
       </header>
+
+      <nav className="bg-[#171c24] border-b border-[#12161c] px-4 py-1.5 flex flex-wrap items-center gap-2 text-xs font-mono">
+        <span className="text-slate-400 mr-1">前往（Go to）：</span>
+        <Link
+          href="/operator"
+          className="hh-softkey rounded px-3 py-1 font-bold text-[#202731]"
+        >
+          ▶ Try the Demo（操作員語音試用）
+        </Link>
+        <Link
+          href="/dashboard"
+          className="hh-softkey rounded px-3 py-1 font-bold text-[#202731]"
+        >
+          ■ Supervisor Board（主管看板）
+        </Link>
+        <Link
+          href="/pitch"
+          className="hh-softkey rounded px-3 py-1 font-bold text-[#202731]"
+        >
+          ★ Pitch Deck（投資簡報）
+        </Link>
+      </nav>
 
       <div className="flex-1 flex flex-col lg:flex-row p-4 gap-4 max-w-[1720px] w-full mx-auto">
         <main className="flex-1 space-y-4">
@@ -645,6 +617,9 @@ export default function Home() {
         <div className="flex items-center gap-4 text-[11px]">
           <span>SYNC: 100%</span>
           <span>LATENCY: 8ms</span>
+          <span className="text-amber-300 font-bold" data-testid="site-version">
+            VoiceAndon {SITE_VERSION}
+          </span>
         </div>
       </footer>
     </main>

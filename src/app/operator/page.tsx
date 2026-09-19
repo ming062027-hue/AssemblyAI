@@ -13,6 +13,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import LiveBoard from "@/board/LiveBoard";
+import ConsoleHeader from "@/components/ConsoleHeader";
+import ConsoleFooter from "@/components/ConsoleFooter";
 import {
   SAMPLE_RATE,
   base64ToPCM16,
@@ -600,27 +602,24 @@ export default function OperatorPage() {
     status === "listening" || status === "thinking" || status === "speaking";
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-16">
-      <header className="flex flex-col gap-2">
-        <p className="text-sm font-medium uppercase tracking-wide text-black/60 dark:text-white/60">
-          Operator voice page
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Talk to the shop-floor assistant
-        </h1>
-        <p className="text-sm leading-6 text-black/70 dark:text-white/70">
+    <div className="min-h-full flex flex-col select-none">
+      <ConsoleHeader
+        title="操作員語音頁 · Operator"
+        subtitle="VIEW: 現場語音助理"
+      />
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 py-6">
+        <p className="text-sm leading-6 text-slate-700">
           {isDev
             ? "Dev mode: talks to the mock server (no key, no charge). Press ①–⑤ to run the demo main line."
             : "Live mode: talks to AssemblyAI over an encrypted connection. Please allow the microphone when asked."}
         </p>
-      </header>
 
       <div className="grid gap-6 md:grid-cols-2">
         <div className="flex flex-col gap-6">
-          <section className="flex flex-col gap-3 rounded-xl border border-black/10 p-5 dark:border-white/15">
+          <section className="flex flex-col gap-3 hh-card rounded-lg p-4">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-lg font-semibold">Status</span>
-              <span className="rounded-full bg-black/5 px-3 py-1 text-sm dark:bg-white/10">
+              <span className="text-base font-bold text-[#202731]">Status</span>
+              <span className="rounded bg-slate-100 border border-slate-300 px-3 py-1 text-xs font-mono font-bold text-[#202731]">
                 {STATUS_TEXT[status]}
                 {status === "listening" ||
                 status === "thinking" ||
@@ -634,18 +633,18 @@ export default function OperatorPage() {
               </span>
             </div>
             {sessionId ? (
-              <p className="font-mono text-xs text-black/60 dark:text-white/60">
+              <p className="font-mono text-xs text-slate-600">
                 session_id={sessionId}
               </p>
             ) : null}
             {connError ? (
-              <p className="text-sm text-red-600 dark:text-red-400">
+              <p className="text-sm text-rose-600">
                 {connError}
               </p>
             ) : null}
 
             <label className="flex flex-col gap-1 text-sm">
-              <span className="text-black/70 dark:text-white/70">
+              <span className="text-slate-700">
                 Demo passcode (required, checked by the server before
                 starting)
               </span>
@@ -657,10 +656,10 @@ export default function OperatorPage() {
                 }}
                 placeholder="passcode"
                 autoComplete="off"
-                className="rounded-lg border border-black/10 bg-transparent px-3 py-2 dark:border-white/15"
+                className="rounded border border-slate-400 bg-white px-3 py-2 text-[#14181f]"
               />
               {passcodeError ? (
-                <span className="text-sm text-red-600 dark:text-red-400">
+                <span className="text-sm text-rose-600">
                   {passcodeError}
                 </span>
               ) : null}
@@ -673,7 +672,7 @@ export default function OperatorPage() {
                 <button
                   onClick={status === "ended" ? reset : startCall}
                   disabled={checking}
-                  className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+                  className="rounded bg-[#0056b3] px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
                 >
                   {checking
                     ? "Checking passcode..."
@@ -686,7 +685,7 @@ export default function OperatorPage() {
               ) : (
                 <button
                   onClick={endCall}
-                  className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+                  className="rounded bg-[#b71c1c] px-4 py-2 text-sm font-bold text-white hover:bg-[#c62828]"
                 >
                   End call (session.end)
                 </button>
@@ -695,9 +694,9 @@ export default function OperatorPage() {
           </section>
 
           {isDev ? (
-            <section className="flex flex-col gap-3 rounded-xl border border-black/10 p-5 dark:border-white/15">
-              <h2 className="text-lg font-semibold">Simulate speech</h2>
-              <p className="text-sm text-black/60 dark:text-white/60">
+            <section className="flex flex-col gap-3 hh-card rounded-lg p-4">
+              <h2 className="text-base font-bold text-[#202731]">Simulate speech</h2>
+              <p className="text-sm text-slate-600">
                 Dev only: sends mock.say to the mock server. Or run the
                 demo main line in order:
               </p>
@@ -708,7 +707,7 @@ export default function OperatorPage() {
                     type="button"
                     onClick={() => sendSay(line)}
                     disabled={!onCall}
-                    className="rounded-lg border border-black/15 px-3 py-1.5 text-sm hover:bg-black/5 disabled:opacity-40 dark:border-white/20 dark:hover:bg-white/10"
+                    className="hh-softkey rounded px-3 py-1.5 text-sm font-bold text-[#202731] disabled:opacity-40"
                   >
                     {["①", "②", "③", "④", "⑤"][i]} Send line {i + 1}
                   </button>
@@ -727,12 +726,12 @@ export default function OperatorPage() {
                   placeholder="Type what the operator says…"
                   autoComplete="off"
                   disabled={!onCall}
-                  className="flex-1 rounded-lg border border-black/10 bg-transparent px-3 py-2 text-sm dark:border-white/15"
+                  className="flex-1 rounded border border-slate-400 bg-white px-3 py-2 text-sm text-[#14181f]"
                 />
                 <button
                   type="submit"
                   disabled={!onCall}
-                  className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-black"
+                  className="rounded bg-[#0056b3] px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-40"
                 >
                   Send
                 </button>
@@ -740,10 +739,10 @@ export default function OperatorPage() {
             </section>
           ) : null}
 
-          <section className="flex flex-col gap-2 rounded-xl border border-black/10 p-5 dark:border-white/15">
-            <h2 className="text-lg font-semibold">Transcript</h2>
+          <section className="flex flex-col gap-2 hh-card rounded-lg p-4">
+            <h2 className="text-base font-bold text-[#202731]">Transcript</h2>
             {chat.length === 0 ? (
-              <p className="text-sm text-black/60 dark:text-white/60">
+              <p className="text-sm text-slate-600">
                 No speech yet.
                 {isDev ? " Press Start, then ①–⑤." : " Press Start and speak."}
               </p>
@@ -761,12 +760,12 @@ export default function OperatorPage() {
             )}
           </section>
 
-          <section className="flex flex-col gap-2 rounded-xl border border-black/10 p-5 dark:border-white/15">
-            <h2 className="text-lg font-semibold">
+          <section className="flex flex-col gap-2 hh-card rounded-lg p-4">
+            <h2 className="text-base font-bold text-[#202731]">
               Event log{isDev ? " (mock)" : ""}
             </h2>
             {log.length === 0 ? (
-              <p className="text-sm text-black/60 dark:text-white/60">
+              <p className="text-sm text-slate-600">
                 No events yet. Press “Start”.
               </p>
             ) : (
@@ -779,10 +778,12 @@ export default function OperatorPage() {
           </section>
         </div>
 
-        <div className="rounded-xl border border-black/10 p-5 dark:border-white/15">
-          <LiveBoard compact />
+          <div className="hh-card rounded-lg p-4">
+            <LiveBoard compact />
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+      <ConsoleFooter />
+    </div>
   );
 }

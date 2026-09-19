@@ -48,7 +48,7 @@ export default function LiveBoard({ compact = false }: { compact?: boolean }) {
           <ClearDemoButton />
         </div>
         {latest.length === 0 ? (
-          <p className="text-sm text-black/60 dark:text-white/60">
+          <p className="text-sm text-slate-600">
             No tickets yet.
           </p>
         ) : (
@@ -56,7 +56,7 @@ export default function LiveBoard({ compact = false }: { compact?: boolean }) {
             {latest.map((ticket) => (
               <li
                 key={ticket.ticket_id}
-                className="rounded-lg border border-black/10 px-3 py-2 text-sm dark:border-white/15"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
               >
                 <span className="font-medium">{ticket.ticket_id}</span>
                 {" · "}
@@ -65,7 +65,7 @@ export default function LiveBoard({ compact = false }: { compact?: boolean }) {
                 {ticket.symptom}
                 {" · "}
                 {ticket.severity}
-                <span className="block text-xs text-black/60 dark:text-white/60">
+                <span className="block text-xs text-slate-600">
                   {formatTime(ticket.created_at)}
                 </span>
               </li>
@@ -79,16 +79,16 @@ export default function LiveBoard({ compact = false }: { compact?: boolean }) {
   return (
     <section aria-label="Repair tickets" className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-black/60 dark:text-white/60">
+        <p className="text-sm text-slate-600">
           {tickets.length === 0
-            ? "Waiting for tickets…"
+            ? "Waiting for tickets… 等待語音開單"
             : `${tickets.length} open ticket${tickets.length === 1 ? "" : "s"}`}
         </p>
         <ClearDemoButton />
       </div>
-      <div className="overflow-x-auto rounded-xl border border-black/10 dark:border-white/15">
+      <div className="overflow-x-auto rounded-lg border border-[#9aa3b4] bg-white">
         <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="bg-black/5 dark:bg-white/10">
+          <thead className="bg-slate-100 border-b border-[#9aa3b4] text-[#202731]">
             <tr>
               <th scope="col" className="px-4 py-3 font-medium">
                 Ticket
@@ -115,7 +115,7 @@ export default function LiveBoard({ compact = false }: { compact?: boolean }) {
               <tr>
                 <td
                   colSpan={6}
-                  className="px-4 py-10 text-center text-black/60 dark:text-white/60"
+                  className="px-4 py-10 text-center text-slate-600"
                 >
                   No open tickets yet.
                 </td>
@@ -124,7 +124,7 @@ export default function LiveBoard({ compact = false }: { compact?: boolean }) {
               tickets.map((ticket) => (
                 <tr
                   key={ticket.ticket_id}
-                  className="border-t border-black/10 dark:border-white/10"
+                  className="border-t border-slate-200"
                 >
                   <td className="px-4 py-3 font-medium">{ticket.ticket_id}</td>
                   <td className="px-4 py-3">{ticket.machine_id}</td>

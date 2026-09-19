@@ -1,11 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import {
-  SITE_DESCRIPTION,
-  SITE_NAME,
-  SITE_VERSION,
-  SITE_YEAR,
-} from "@/config/site";
+import { SITE_DESCRIPTION, SITE_NAME } from "@/config/site";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -34,10 +29,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <div className="flex flex-1 flex-col">{children}</div>
-        <footer className="border-t border-black/10 px-6 py-4 text-center text-xs text-black/60 dark:border-white/15 dark:text-white/60">
-          © {SITE_YEAR} {SITE_NAME} · Demo data is fictional ·{" "}
-          <span data-testid="site-version">{SITE_VERSION}</span>
-        </footer>
       </body>
     </html>
   );

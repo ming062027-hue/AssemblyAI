@@ -4,6 +4,8 @@ import { Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PITCH_SLIDES, clampPitchPage } from "@/content/pitch";
+import ConsoleHeader from "@/components/ConsoleHeader";
+import ConsoleFooter from "@/components/ConsoleFooter";
 
 function ScreenSlide({ page, total }: { page: number; total: number }) {
   const slide = PITCH_SLIDES[page - 1];
@@ -60,7 +62,7 @@ function Deck() {
           >
             ← Home
           </Link>
-          <p className="text-sm text-black/60 dark:text-white/60">
+          <p className="text-sm text-slate-600">
             Use ← → keys to move · print this page for the PDF slides
           </p>
         </div>
@@ -106,7 +108,7 @@ function Deck() {
                 aria-current={i + 1 === page ? "page" : undefined}
                 className={`min-w-9 rounded-md px-2 py-1 text-center text-sm ${
                   i + 1 === page
-                    ? "bg-black text-white dark:bg-white dark:text-black"
+                    ? "bg-[#0056b3] text-white"
                     : "border border-black/15 text-black/60 hover:border-black/40 dark:border-white/20 dark:text-white/60 dark:hover:border-white/50"
                 }`}
               >
@@ -138,7 +140,7 @@ function Deck() {
         .pitch-print { display: none; }
         @page { size: landscape; margin: 0; }
         @media print {
-          .pitch-screen { display: none !important; }
+          .pitch-screen, header { display: none !important; }
           footer { display: none !important; }
           body { background: #0a0a0a !important; }
           .pitch-print { display: block !important; }
@@ -191,14 +193,21 @@ function Deck() {
 
 export default function PitchPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="pitch-screen mx-auto flex w-full max-w-6xl flex-1 flex-col items-center gap-4 px-4 py-8">
-          <ScreenSlide page={1} total={PITCH_SLIDES.length} />
-        </div>
-      }
-    >
-      <Deck />
-    </Suspense>
+    <div className="min-h-full flex flex-col select-none">
+      <ConsoleHeader
+        title="專案簡報 · Pitch Deck"
+        subtitle="VIEW: VoiceAndon 10 頁簡報（← → 換頁）"
+      />
+      <Suspense
+        fallback={
+          <div className="pitch-screen mx-auto flex w-full max-w-6xl flex-1 flex-col items-center gap-4 px-4 py-8">
+            <ScreenSlide page={1} total={PITCH_SLIDES.length} />
+          </div>
+        }
+      >
+        <Deck />
+      </Suspense>
+      <ConsoleFooter />
+    </div>
   );
 }
