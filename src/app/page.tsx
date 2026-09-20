@@ -12,6 +12,7 @@ import { SITE_VERSION } from "@/config/site";
 import {
   interpret,
   emptyContext,
+  buildStartupReport,
   type CommandContext,
 } from "@/console/commands";
 import { subscribe, list, type Ticket } from "@/board/ticketStore";
@@ -89,8 +90,9 @@ export default function Home() {
   const [mvDraft, setMvDraft] = useState("");
   const [mvCtx, setMvCtx] = useState<CommandContext>(emptyContext());
   const [mvReply, setMvReply] = useState(
-    "我是 Model宇宙。說「機台 3 狀態」「查警報 414」「開維修單」「看手臂數據」，我幫你操控畫面。",
+    "我是 Model宇宙，正在開機巡檢（掃 5 站＋庫存＋待修單），等一下跟你報告。",
   );
+  const [urgeCount, setUrgeCount] = useState(0); // 本次開機累計催料次數（交班摘要用）
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [voiceOn, setVoiceOn] = useState(true);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -144,6 +146,7 @@ export default function Home() {
   }, []);
 
   const callSupplierManual = useCallback((mat: string) => {
+    setUrgeCount((n) => n + 1);
     setSupplierMsg(`[AI通話完成] 已致電供應商催促『${mat}』，工單已建立。`);
     if (msgTimer.current) clearTimeout(msgTimer.current);
     msgTimer.current = setTimeout(() => setSupplierMsg(null), 4000);
@@ -161,26 +164,38 @@ export default function Home() {
     if (dialogTimer.current) clearTimeout(dialogTimer.current);
   }, []);
 
-  // 宇宙開口講話（瀏覽器內建 TTS，免費，固定 zh-TW 女聲、正常語速 rate=1.0）。
+  // 宇宙開口講話（瀏覽器內建 TTS，免費，固定 zh-TW 女聲、正常語速 rate=1.0；
+  // 英文模式改用 en-US 聲音，語速一樣 1.0）。
   // 女聲挑法：zh 語音裡名字帶 女/female/常見女聲名 → Google 中文 → 第一個 zh。
   const speak = useCallback(
-    (text: string) => {
+    (text: string, lang: "zh" | "en" = "zh") => {
       if (!voiceOn || typeof window === "undefined" || !window.speechSynthesis) return;
       try {
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
-        u.lang = "zh-TW";
-        u.rate = 1.0;
         const voices = window.speechSynthesis.getVoices();
-        const zh = voices.filter((v) => v.lang.toLowerCase().startsWith("zh"));
-        const pool = zh.filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith("zh-tw")).length
-          ? zh.filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith("zh-tw"))
-          : zh;
-        const female =
-          pool.find((v) => /女|female|mei-?jia|ting|yun|hsiao|ying|lin/i.test(v.name)) ??
-          pool.find((v) => /google/i.test(v.name)) ??
-          pool[0];
-        if (female) u.voice = female;
+        if (lang === "en") {
+          u.lang = "en-US";
+          u.rate = 1.0;
+          const pool = voices.filter((v) => v.lang.toLowerCase().startsWith("en"));
+          const pick =
+            pool.find((v) => /female|google us english|samantha|zira/i.test(v.name)) ??
+            pool.find((v) => /google/i.test(v.name)) ??
+            pool[0];
+          if (pick) u.voice = pick;
+        } else {
+          u.lang = "zh-TW";
+          u.rate = 1.0;
+          const zh = voices.filter((v) => v.lang.toLowerCase().startsWith("zh"));
+          const pool = zh.filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith("zh-tw")).length
+            ? zh.filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith("zh-tw"))
+            : zh;
+          const female =
+            pool.find((v) => /女|female|mei-?jia|ting|yun|hsiao|ying|lin/i.test(v.name)) ??
+            pool.find((v) => /google/i.test(v.name)) ??
+            pool[0];
+          if (female) u.voice = female;
+        }
         window.speechSynthesis.speak(u);
       } catch {
         // TTS 失敗不致命
@@ -205,14 +220,15 @@ export default function Home() {
     (text: string) => {
       const t = text.trim();
       if (!t) return;
-      const res = interpret(t, mvCtx);
+      // 看板即時狀態傳進 interpret：交班摘要／今日報表／單號進度用，不讀別人的檔。
+      const res = interpret(t, mvCtx, { tickets: list(), urges: urgeCount });
       setMvCtx(res.context);
       setMvReply(res.response);
-      speak(res.response);
+      speak(res.response, res.context.lang);
       if (res.clearAlarm) {
         setIsAlarm(false); // 跟按鈕/F6 同一個效果
       } else if (res.alarm) {
-        setIsAlarm(true);
+        setIsAlarm(true); // 異常推播：紅球＋警報面板跳出＋回話問切畫面
         setView("f1"); // 警報 → 讓總覽亮起來（站別 04＋伺服＋CLOSED-LOOP）
       } else if (res.navigate) {
         setView(res.navigate);
@@ -224,8 +240,27 @@ export default function Home() {
       setMvListening(false);
       openDialog(); // 講完彈出對話框，6 秒後自動收回
     },
-    [mvCtx, speak, openDialog, dispatchAgv, callSupplierManual],
+    [mvCtx, urgeCount, speak, openDialog, dispatchAgv, callSupplierManual],
   );
+
+  // 開機巡檢：載入後自動掃 5 站＋庫存＋待修單，宇宙開場報告＋問從哪開始。
+  // 延遲 1.5 秒等 TTS 聲音載入；警報站（M03）存在時直接亮紅燈＋推播。
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const open = list().filter((tk) => (tk.status ?? "open") === "open").length;
+      const r = buildStartupReport(open);
+      setMvReply(r.text);
+      speak(r.text, "zh");
+      if (r.hasAlarm) {
+        setIsAlarm(true);
+        setView("f1");
+      }
+      openDialog();
+    }, 1500);
+    return () => window.clearTimeout(timer);
+    // 只跑一次：開機巡檢。speak/openDialog 是 stable callback。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 點麥克風：用瀏覽器內建語音辨識（Chrome 免費）真的聽你講中文。
   const onMic = useCallback(() => {
@@ -1069,7 +1104,7 @@ export default function Home() {
               </button>
             </form>
             <div className="text-[10px] text-slate-400 font-mono leading-relaxed">
-              試試說：F1、手臂數據、查警報 414、開維修單、解除警報…
+              試試說：查警報 414、開維修單、耗材還夠嗎、今日報表、交班…
             </div>
           </div>
         )}
@@ -1082,7 +1117,7 @@ export default function Home() {
           aria-pressed={mvListening}
           aria-label="Model宇宙語音球：點一下說話，拖曳移動"
           title="點一下說話，拖曳移動"
-          className={`mv-orb w-24 h-24 flex items-center justify-center${mvListening ? " listening" : ""}`}
+          className={`mv-orb w-24 h-24 flex items-center justify-center${mvListening ? " listening" : ""}${isAlarm ? " alarm" : ""}`}
         >
           {/* 球面只留星空漸層＋高光＋mic，不放文字 */}
           <i data-lucide="mic" className="w-8 h-8 text-white drop-shadow" />
