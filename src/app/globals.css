@@ -94,102 +94,62 @@ body {
   }
 }
 
-/* ===== Model宇宙 JARVIS 控制台（只用既有 slate/blue/amber，加「光＋動」）===== */
-.jv-stage {
+/* ===== Model宇宙 語音球：常駐浮層（銀河系配色＋3D＋呼吸＋可拖曳）===== */
+.mv-orb {
   position: relative;
+  border-radius: 9999px;
+  cursor: grab;
+  /* 銀河系：深藍紫漸層底＋多層徑向高光（3D 立體感） */
   background:
-    radial-gradient(1200px 600px at 50% -12%, rgba(0, 86, 179, 0.20), transparent 60%),
-    radial-gradient(900px 500px at 50% 118%, rgba(224, 147, 15, 0.08), transparent 60%),
-    #171c24;
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 26%),
+    radial-gradient(circle at 50% 42%, #bcd6ff 0%, #5b8def 24%, #2b3f9e 52%, #171a52 74%, #0a0c2e 100%);
+  box-shadow:
+    0 0 0 2px rgba(150, 180, 255, 0.55),
+    0 10px 28px rgba(10, 10, 60, 0.55),
+    0 0 44px 8px rgba(80, 110, 255, 0.5),
+    inset -10px -14px 28px rgba(5, 5, 30, 0.65),
+    inset 6px 8px 18px rgba(255, 255, 255, 0.25);
+  animation: mv-breathe 3.4s ease-in-out infinite;
+  touch-action: none;
+  user-select: none;
 }
-.jv-stage::before {
+.mv-orb:active {
+  cursor: grabbing;
+}
+/* 星點：兩層小圓點，用多重背景一次畫完 */
+.mv-orb::before {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: 6%;
+  border-radius: 9999px;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(120, 160, 220, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(120, 160, 220, 0.06) 1px, transparent 1px);
-  background-size: 40px 40px;
-  -webkit-mask-image: radial-gradient(75% 70% at 50% 42%, #000 0%, transparent 92%);
-  mask-image: radial-gradient(75% 70% at 50% 42%, #000 0%, transparent 92%);
+    radial-gradient(1.5px 1.5px at 22% 30%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 68% 18%, #fff 50%, transparent 51%),
+    radial-gradient(1.2px 1.2px at 78% 52%, #dfe8ff 50%, transparent 51%),
+    radial-gradient(1px 1px at 40% 72%, #fff 50%, transparent 51%),
+    radial-gradient(1.4px 1.4px at 58% 62%, #e8eeff 50%, transparent 51%),
+    radial-gradient(1px 1px at 30% 55%, #cfd9ff 50%, transparent 51%),
+    radial-gradient(1px 1px at 82% 30%, #fff 50%, transparent 51%);
 }
-.jv-panel {
-  background: rgba(29, 36, 47, 0.72);
-  border: 1px solid rgba(80, 140, 220, 0.35);
+.mv-orb.listening {
+  animation: mv-breathe 1.2s ease-in-out infinite;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 0 24px rgba(0, 86, 179, 0.12);
-  backdrop-filter: blur(6px);
+    0 0 0 2px rgba(255, 210, 140, 0.65),
+    0 10px 28px rgba(60, 30, 0, 0.55),
+    0 0 60px 12px rgba(255, 170, 60, 0.55),
+    inset -10px -14px 28px rgba(40, 15, 0, 0.6),
+    inset 6px 8px 18px rgba(255, 255, 255, 0.3);
 }
-.jv-orb {
-  border-radius: 9999px;
-  background: radial-gradient(circle at 50% 36%, #eaf3ff 0%, #6fb0ff 22%, #0056b3 55%, #002a5c 100%);
-  box-shadow:
-    0 0 0 2px rgba(140, 190, 255, 0.5),
-    0 0 42px 6px rgba(0, 110, 220, 0.55),
-    inset 0 0 30px rgba(255, 255, 255, 0.35);
-  animation: jv-breathe 3.2s ease-in-out infinite;
+@keyframes mv-breathe {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.07); filter: brightness(1.18); }
 }
-.jv-orb.listening {
-  background: radial-gradient(circle at 50% 36%, #fff2d8 0%, #ffcf7a 22%, #e0930f 55%, #7a4d00 100%);
-  box-shadow:
-    0 0 0 2px rgba(255, 210, 140, 0.6),
-    0 0 58px 10px rgba(224, 147, 15, 0.6),
-    inset 0 0 30px rgba(255, 255, 255, 0.35);
-  animation: jv-breathe 1.1s ease-in-out infinite;
+/* 對話框：平時收起，講話/回話時才彈出，說完自動收回 */
+.mv-dialog {
+  animation: mv-dialog-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
-@keyframes jv-breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.06); }
-}
-.jv-ring {
-  border-radius: 9999px;
-  border: 1px dashed rgba(120, 180, 255, 0.4);
-  animation: jv-spin 16s linear infinite;
-}
-.jv-ring.rev {
-  border-style: dotted;
-  border-color: rgba(224, 147, 15, 0.35);
-  animation-duration: 24s;
-  animation-direction: reverse;
-}
-@keyframes jv-spin { to { transform: rotate(360deg); } }
-.jv-float { animation: jv-float 5.5s ease-in-out infinite; }
-@keyframes jv-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-}
-.jv-btn {
-  background: rgba(29, 36, 47, 0.7);
-  border: 1px solid rgba(80, 140, 220, 0.4);
-  color: #dbe7f7;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
-}
-.jv-btn:hover {
-  transform: translateY(-3px);
-  border-color: rgba(120, 180, 255, 0.9);
-  box-shadow: 0 6px 22px rgba(0, 86, 179, 0.35);
-  background: rgba(40, 55, 80, 0.85);
-}
-.jv-btn.active {
-  border-color: #0056b3;
-  background: rgba(0, 86, 179, 0.28);
-  box-shadow: 0 0 22px rgba(0, 86, 179, 0.5);
-  color: #fff;
-}
-.jv-screen { animation: jv-screen-in 0.45s cubic-bezier(0.2, 0.7, 0.2, 1); }
-@keyframes jv-screen-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+@keyframes mv-dialog-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
   to { opacity: 1; transform: none; }
-}
-.jv-chip {
-  background: rgba(0, 86, 179, 0.16);
-  border: 1px solid rgba(80, 140, 220, 0.45);
-  color: #cfe0f5;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-.jv-chip:hover {
-  background: rgba(0, 86, 179, 0.34);
-  border-color: rgba(120, 180, 255, 0.9);
 }

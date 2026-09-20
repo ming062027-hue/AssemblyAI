@@ -11,7 +11,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { SITE_VERSION } from "@/config/site";
 import {
   interpret,
-  PRESET_COMMANDS,
   emptyContext,
   type CommandContext,
 } from "@/console/commands";
@@ -32,6 +31,38 @@ const TAB_NAMES: Record<ViewKey, string> = {
   f4: "F4 原料庫存與補叫料",
   f5: "F5 AI 外部通訊錄明細",
 };
+
+// 派工包 v2 §2.1 中央狀態：五站子項各自燈號（§3 表）。
+// green 正常 / blue 搬運中（補料中＝藍）/ amber 待命 / red 警報
+type Light = "green" | "blue" | "amber" | "red";
+const LIGHT_DOT: Record<Light, string> = {
+  green: "bg-emerald-500",
+  blue: "bg-blue-500",
+  amber: "bg-amber-500",
+  red: "bg-rose-500",
+};
+function stationBadge(lights: Light[]): { label: string; cls: string } {
+  if (lights.includes("red")) return { label: "警報", cls: "text-rose-700" };
+  if (lights.includes("blue")) return { label: "搬運中", cls: "text-blue-700" };
+  if (lights.includes("amber")) return { label: "待命中", cls: "text-amber-700" };
+  return { label: "正常", cls: "text-emerald-700" };
+}
+function SubDot({ light }: { light: Light }) {
+  return (
+    <span
+      className={`inline-block w-2 h-2 rounded-full ${LIGHT_DOT[light]}`}
+      aria-label={light}
+    />
+  );
+}
+
+// 語音催料的材料代號→中文品名（跟 F4 表格一致）。
+function supplierName(code: string): string {
+  const c = code.toUpperCase();
+  if (c.includes("AL6061")) return "AL6061 方棒";
+  if (c.includes("SUS304")) return "SUS304 棒材";
+  return "S45C 圓棒材";
+}
 
 // 瀏覽器內建語音辨識（webkitSpeechRecognition）沒有內建 TS 型別，這裡給最小型別。
 type SpeechRec = {
@@ -65,6 +96,20 @@ export default function Home() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<SpeechRec | null>(null);
 
+  // Model宇宙 常駐浮層：平時只剩球，對話框講話時才彈出、說完自動收回。
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const dialogTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // orbPos=null＝預設右下角；拖曳後記住座標，放開停留在該處。
+  const [orbPos, setOrbPos] = useState<{ x: number; y: number } | null>(null);
+  const floatRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{
+    startX: number;
+    startY: number;
+    baseX: number;
+    baseY: number;
+    moved: boolean;
+  } | null>(null);
+
   useEffect(() => {
     const id = setInterval(() => {
       setClock(new Date().toLocaleTimeString("zh-TW", { hour12: false }));
@@ -77,6 +122,7 @@ export default function Home() {
   useEffect(
     () => () => {
       if (msgTimer.current) clearTimeout(msgTimer.current);
+      if (dialogTimer.current) clearTimeout(dialogTimer.current);
     },
     [],
   );
@@ -103,7 +149,17 @@ export default function Home() {
     msgTimer.current = setTimeout(() => setSupplierMsg(null), 4000);
   }, []);
 
-  const resetAlarm = useCallback(() => setIsAlarm(false), []);
+  // 對話框：打開後 6 秒沒新訊息自動收回，只剩球。
+  const openDialog = useCallback(() => {
+    setDialogOpen(true);
+    if (dialogTimer.current) clearTimeout(dialogTimer.current);
+    dialogTimer.current = setTimeout(() => setDialogOpen(false), 6000);
+  }, []);
+
+  const closeDialog = useCallback(() => {
+    setDialogOpen(false);
+    if (dialogTimer.current) clearTimeout(dialogTimer.current);
+  }, []);
 
   // 宇宙開口講話（瀏覽器內建 TTS，免費，優先用中文聲音）。
   const speak = useCallback(
@@ -126,6 +182,16 @@ export default function Home() {
     [voiceOn],
   );
 
+  // 派工包 v2 §4：解除警報只有這一個函式。
+  // 語音「解除警報」＋警報面板按鈕＋F6 都接它：面板收回、04 轉正常。
+  const clearAlarm = useCallback(() => {
+    setIsAlarm(false);
+    const msg = "警報已解除，04 加工區恢復正常，警報面板已收回。";
+    setMvReply(msg);
+    speak(msg);
+    openDialog();
+  }, [speak, openDialog]);
+
   const runModelCommand = useCallback(
     (text: string) => {
       const t = text.trim();
@@ -134,17 +200,22 @@ export default function Home() {
       setMvCtx(res.context);
       setMvReply(res.response);
       speak(res.response);
-      if (res.alarm) {
+      if (res.clearAlarm) {
+        setIsAlarm(false); // 跟按鈕/F6 同一個效果
+      } else if (res.alarm) {
         setIsAlarm(true);
         setView("f1"); // 警報 → 讓總覽亮起來（站別 04＋伺服＋CLOSED-LOOP）
       } else if (res.navigate) {
         setView(res.navigate);
       }
-      if (res.ticketId) setTickets(list()); // 同分頁強制刷新看板
+      if (res.agv) dispatchAgv(res.agv.id, res.agv.task);
+      if (res.supplier) callSupplierManual(supplierName(res.supplier.material));
+      if (res.ticketId || res.ticketResolveId) setTickets(list()); // 同分頁強制刷新看板
       setMvDraft("");
       setMvListening(false);
+      openDialog(); // 講完彈出對話框，6 秒後自動收回
     },
-    [mvCtx, speak],
+    [mvCtx, speak, openDialog, dispatchAgv, callSupplierManual],
   );
 
   // 點麥克風：用瀏覽器內建語音辨識（Chrome 免費）真的聽你講中文。
@@ -161,7 +232,8 @@ export default function Home() {
     const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
     if (!Ctor) {
       setMvReply("這個瀏覽器不支援語音辨識，請用下面的輸入框打字（Chrome 可以用講的）。");
-      inputRef.current?.focus();
+      openDialog();
+      window.setTimeout(() => inputRef.current?.focus(), 60);
       return;
     }
     const rec = new Ctor();
@@ -177,14 +249,60 @@ export default function Home() {
     rec.onerror = () => setMvListening(false);
     recognitionRef.current = rec;
     setMvListening(true);
+    openDialog(); // 開始聽就彈出對話框
     try {
       rec.start();
     } catch {
       setMvListening(false);
     }
-  }, [mvListening, runModelCommand]);
+  }, [mvListening, runModelCommand, openDialog]);
+
+  // 宇宙球拖曳：點一下＝說話（onMic），拖著走＝移動，放開停留在該處。
+  const orbPress = (clientX: number, clientY: number) => {
+    const rect = floatRef.current?.getBoundingClientRect();
+    dragRef.current = {
+      startX: clientX,
+      startY: clientY,
+      baseX: rect ? rect.left : window.innerWidth - 140,
+      baseY: rect ? rect.top : window.innerHeight - 140,
+      moved: false,
+    };
+  };
+  const orbMove = (clientX: number, clientY: number) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = clientX - d.startX;
+    const dy = clientY - d.startY;
+    if (Math.abs(dx) + Math.abs(dy) > 5) d.moved = true;
+    if (d.moved) {
+      const x = Math.min(Math.max(d.baseX + dx, 8), window.innerWidth - 120);
+      const y = Math.min(Math.max(d.baseY + dy, 8), window.innerHeight - 120);
+      setOrbPos({ x, y });
+    }
+  };
+  const orbRelease = () => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (d && !d.moved) onMic();
+  };
+  const handleOrbMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    orbPress(e.clientX, e.clientY);
+    const move = (ev: MouseEvent) => orbMove(ev.clientX, ev.clientY);
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      orbRelease();
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
 
   const latestTickets = [...tickets].slice(-5).reverse();
+  const openCount = tickets.filter((x) => (x.status ?? "open") === "open").length;
+  const resolvedCount = tickets.length - openCount;
+  // 派工包 v2 §3：五站子項燈號。03「1 號手臂物料區補料中」＝藍燈。
+  const lights04: Light[] = ["green", isAlarm ? "red" : "green"];
 
   return (
     <main className="min-h-full flex flex-col select-none">
@@ -253,17 +371,25 @@ export default function Home() {
                 {/* 01 碼頭進貨 */}
                 <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[260px]">
                   <div className="flex justify-between text-[12px] font-mono font-bold">
-                    <span>01 碼頭進貨</span><span className="text-emerald-700">● 正常</span>
+                    <span>01 碼頭進貨</span>
+                    {(() => {
+                      const b = stationBadge(["green", "green"]);
+                      return <span className={b.cls}>● {b.label}</span>;
+                    })()}
                   </div>
                   <div className="flex-1 flex flex-col gap-2">
                     <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
-                      <div className="text-[11px] font-bold text-[#0056b3] mb-1">A 碼頭進貨</div>
+                      <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center gap-1.5">
+                        <SubDot light="green" />A 碼頭進貨
+                      </div>
                       <div className="text-[10px] text-slate-600 leading-relaxed font-mono">
                         司機 AA｜車牌 BBB-123<br />10:00 碼頭下貨<br />1 號 AGV 來下貨
                       </div>
                     </div>
                     <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
-                      <div className="text-[11px] font-bold text-[#0056b3] mb-1">B 碼頭進貨</div>
+                      <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center gap-1.5">
+                        <SubDot light="green" />B 碼頭進貨
+                      </div>
                       <div className="text-[10px] text-slate-600 leading-relaxed font-mono">
                         司機 BB｜車牌 CCC-456<br />15:00 到碼頭<br />2 號 AGV 來下貨
                       </div>
@@ -274,18 +400,26 @@ export default function Home() {
                 {/* 02 下貨入庫 AGV */}
                 <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[260px]">
                   <div className="flex justify-between text-[12px] font-mono font-bold">
-                    <span>02 下貨入庫 AGV</span><span className="text-blue-700">● 搬運中</span>
+                    <span>02 下貨入庫 AGV</span>
+                    {(() => {
+                      const b = stationBadge(["blue", "blue"]);
+                      return <span className={b.cls}>● {b.label}</span>;
+                    })()}
                   </div>
                   <div className="flex-1 flex flex-col gap-2">
                     <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
-                      <div className="text-[11px] font-bold text-[#0056b3] mb-1">1 號 AGV</div>
+                      <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center gap-1.5">
+                        <SubDot light="blue" />1 號 AGV
+                      </div>
                       <div className="text-[10px] text-slate-600 leading-relaxed">
                         確認司機車牌 · 碼頭<br />品名/數量/材質/供應商<br />
                         <span className="font-mono font-bold text-slate-800">入庫 A 櫃 2-1</span>
                       </div>
                     </div>
                     <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
-                      <div className="text-[11px] font-bold text-[#0056b3] mb-1">2 號 AGV</div>
+                      <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center gap-1.5">
+                        <SubDot light="blue" />2 號 AGV
+                      </div>
                       <div className="text-[10px] text-slate-600 leading-relaxed">
                         確認司機車牌 · 碼頭<br />品名/數量/材質/供應商<br />
                         <span className="font-mono font-bold text-slate-800">入庫 B 櫃 1-1</span>
@@ -294,14 +428,20 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* 03 取料 AGV */}
+                {/* 03 取料 AGV：1 號手臂物料區補料中＝藍燈（派工包 v2 §3） */}
                 <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[260px]">
                   <div className="flex justify-between text-[12px] font-mono font-bold">
-                    <span>03 取料 AGV</span><span className="text-amber-700">● 待命中</span>
+                    <span>03 取料 AGV</span>
+                    {(() => {
+                      const b = stationBadge(["blue", "amber"]);
+                      return <span className={b.cls}>● {b.label}</span>;
+                    })()}
                   </div>
                   <div className="flex-1 flex flex-col gap-2">
                     <div className="p-2 rounded bg-amber-50 border border-amber-300 flex-1">
-                      <div className="text-[11px] font-bold text-amber-800 mb-1">1 號手臂物料區</div>
+                      <div className="text-[11px] font-bold text-amber-800 mb-1 flex items-center gap-1.5">
+                        <SubDot light="blue" />1 號手臂物料區 · 補料中
+                      </div>
                       <div className="text-[10px] text-slate-700 leading-relaxed">
                         <span className="text-rose-700 font-bold">低於下限 · 補貨</span><br />
                         鋁鋼｜100 支｜S45C<br />
@@ -309,7 +449,9 @@ export default function Home() {
                       </div>
                     </div>
                     <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
-                      <div className="text-[11px] font-bold text-[#0056b3] mb-1">2 號手臂物料區</div>
+                      <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center gap-1.5">
+                        <SubDot light="amber" />2 號手臂物料區
+                      </div>
                       <div className="text-[10px] text-emerald-700 font-bold leading-relaxed">
                         原料正常<br />待命中
                       </div>
@@ -317,22 +459,29 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* 04 加工區（正常 / 警報） */}
+                {/* 04 加工區（正常 / 警報）：子項燈號跟著 isAlarm 走 */}
                 <div className={`p-3 rounded flex flex-col gap-2 min-h-[260px] ${isAlarm ? "bg-rose-50 border-2 border-rose-600 shadow-sm" : "bg-white/70 border border-[#9aa3b4]"}`}>
                   <div className={`flex justify-between text-[12px] font-mono font-bold ${isAlarm ? "text-rose-800" : ""}`}>
                     <span>04 加工區</span>
-                    <span className={isAlarm ? "text-rose-700 animate-pulse font-black" : "text-emerald-700"}>
-                      ● {isAlarm ? "警報" : "正常"}
-                    </span>
+                    {(() => {
+                      const b = stationBadge(lights04);
+                      return (
+                        <span className={isAlarm ? "text-rose-700 animate-pulse font-black" : b.cls}>
+                          ● {b.label}
+                        </span>
+                      );
+                    })()}
                   </div>
                   <div className="flex-1 flex flex-col gap-2">
                     <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
-                      <div className="text-[11px] font-bold text-[#0056b3] mb-1">1 號機械手臂 · AE800</div>
+                      <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center gap-1.5">
+                        <SubDot light="green" />1 號機械手臂 · AE800
+                      </div>
                       <div className="text-[10px] text-slate-600 leading-relaxed">物料區 › 自檢成品 › 成品區</div>
                     </div>
                     <div className={`p-2 rounded border flex-1 ${isAlarm ? "bg-rose-100 border-rose-300" : "bg-slate-50 border-slate-200"}`}>
-                      <div className={`text-[11px] font-bold mb-1 ${isAlarm ? "text-rose-900" : "text-[#0056b3]"}`}>
-                        2 號機械手臂 · AF800{isAlarm ? "：E-402" : ""}
+                      <div className={`text-[11px] font-bold mb-1 flex items-center gap-1.5 ${isAlarm ? "text-rose-900" : "text-[#0056b3]"}`}>
+                        <SubDot light={lights04[1]} />2 號機械手臂 · AF800{isAlarm ? "：E-402" : ""}
                       </div>
                       <div className={`text-[10px] leading-relaxed ${isAlarm ? "text-rose-700 font-bold" : "text-slate-600"}`}>
                         {isAlarm ? "J2 伺服過載 142%" : "物料區 › 自檢成品 › 成品區"}
@@ -344,15 +493,23 @@ export default function Home() {
                 {/* 05 品檢入庫 AGV */}
                 <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[260px]">
                   <div className="flex justify-between text-[12px] font-mono font-bold">
-                    <span>05 品檢入庫 AGV</span><span className="text-emerald-700">● 正常</span>
+                    <span>05 品檢入庫 AGV</span>
+                    {(() => {
+                      const b = stationBadge(["green", "green"]);
+                      return <span className={b.cls}>● {b.label}</span>;
+                    })()}
                   </div>
                   <div className="flex-1 flex flex-col gap-2">
                     <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
-                      <div className="text-[11px] font-bold text-[#0056b3] mb-1">3 號 AGV · 1 號手臂</div>
+                      <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center gap-1.5">
+                        <SubDot light="green" />3 號 AGV · 1 號手臂
+                      </div>
                       <div className="text-[10px] text-slate-600 leading-relaxed">成品區搬運 › 品檢區</div>
                     </div>
                     <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
-                      <div className="text-[11px] font-bold text-[#0056b3] mb-1">4 號 AGV · 2 號手臂</div>
+                      <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center gap-1.5">
+                        <SubDot light="green" />4 號 AGV · 2 號手臂
+                      </div>
                       <div className="text-[10px] text-slate-600 leading-relaxed">成品區搬運 › 品檢區</div>
                     </div>
                   </div>
@@ -360,14 +517,16 @@ export default function Home() {
               </div>
             </section>
 
-            {/* 語音開單即時看板（Model宇宙 開的單） */}
+            {/* 語音開單即時看板（Model宇宙 開的單；resolved 標已完成） */}
             <section className="hh-card rounded-lg p-4">
               <div className="flex justify-between items-center pb-2 mb-2 border-b border-[#9aa3b4]">
                 <h2 className="text-sm font-bold text-[#202731] flex items-center gap-2">
                   <i data-lucide="clipboard-list" className="w-4 h-4 text-[#0056b3]" />
                   語音開單即時看板
                 </h2>
-                <span className="text-xs font-mono font-semibold text-slate-600">{tickets.length} 張單</span>
+                <span className="text-xs font-mono font-semibold text-slate-600">
+                  {openCount} 待修＋{resolvedCount} 已完成
+                </span>
               </div>
               {latestTickets.length === 0 ? (
                 <div className="text-center text-slate-500 text-xs py-3 font-mono">
@@ -378,27 +537,42 @@ export default function Home() {
                   <table className="w-full text-xs text-left">
                     <thead className="bg-slate-100 border-b font-mono text-slate-600">
                       <tr>
-                        <th className="p-2">工單</th><th className="p-2">機台</th><th className="p-2">症狀</th><th className="p-2">嚴重度</th><th className="p-2">時間</th>
+                        <th className="p-2">工單</th><th className="p-2">機台</th><th className="p-2">症狀</th><th className="p-2">嚴重度</th><th className="p-2">狀態</th><th className="p-2">時間</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {latestTickets.map((t) => (
-                        <tr key={t.ticket_id}>
-                          <td className="p-2 font-mono font-bold text-[#0056b3]">{t.ticket_id}</td>
-                          <td className="p-2 font-mono">{t.machine_id}</td>
-                          <td className="p-2">{t.symptom}</td>
-                          <td className="p-2 text-amber-700 font-bold">{t.severity}</td>
-                          <td className="p-2 font-mono text-slate-500">{new Date(t.created_at).toLocaleTimeString("zh-TW", { hour12: false })}</td>
-                        </tr>
-                      ))}
+                      {latestTickets.map((t) => {
+                        const done = (t.status ?? "open") === "resolved";
+                        return (
+                          <tr key={t.ticket_id} className={done ? "bg-emerald-50/60" : undefined}>
+                            <td className="p-2 font-mono font-bold text-[#0056b3]">{t.ticket_id}</td>
+                            <td className="p-2 font-mono">{t.machine_id}</td>
+                            <td className="p-2">{t.symptom}</td>
+                            <td className="p-2 text-amber-700 font-bold">{t.severity}</td>
+                            <td className="p-2">
+                              {done ? (
+                                <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300">
+                                  已完成
+                                </span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-300">
+                                  待修
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-2 font-mono text-slate-500">{new Date(t.created_at).toLocaleTimeString("zh-TW", { hour12: false })}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
             </section>
 
-            {/* 警報才出現：伺服軸監控 ＋ AI CLOSED-LOOP */}
+            {/* 警報才出現：伺服軸監控 ＋ AI CLOSED-LOOP ＋解除警報鈕 */}
             {isAlarm && (
+              <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <section className="hh-card rounded-lg p-4 font-mono text-xs space-y-2">
                   <div className="font-bold border-b border-[#9aa3b4] pb-1 flex justify-between">
@@ -425,6 +599,15 @@ export default function Home() {
                     <div className="text-[11px] text-slate-700 mt-0.5">S45C 鋼材庫存偏低，自動叫料 200 支，明日 09:00 前送達。</div>
                   </div>
                 </section>
+              </div>
+              <button
+                type="button"
+                onClick={clearAlarm}
+                className="w-full py-2.5 rounded-lg text-sm font-bold bg-[#b71c1c] hover:bg-[#c62828] text-white border border-[#7f0000] shadow-md transition flex items-center justify-center gap-2"
+              >
+                <span aria-hidden="true">●</span>
+                解除警報（跟語音「解除警報」/ F6 同一個功能）
+              </button>
               </div>
             )}
           </div>
@@ -726,17 +909,26 @@ export default function Home() {
               <span className="font-mono text-sm">F5: AI 外部通訊錄明細</span>
               <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
             </button>
-            <button type="button" onClick={resetAlarm} className="py-3 px-3.5 rounded-lg text-left text-xs font-bold bg-[#b71c1c] hover:bg-[#c62828] text-white border border-[#7f0000] shadow-md flex justify-between items-center transition">
+            <button type="button" onClick={clearAlarm} className="py-3 px-3.5 rounded-lg text-left text-xs font-bold bg-[#b71c1c] hover:bg-[#c62828] text-white border border-[#7f0000] shadow-md flex justify-between items-center transition">
               <span className="font-mono text-sm font-bold">F6: 警報靜音 / 重置</span>
               <i data-lucide="bell-off" className="w-4 h-4 text-rose-200" />
             </button>
           </div>
+        </aside>
+      </div>
 
-          {/* Model宇宙 語音管家 */}
-          <div className="hh-card rounded-lg p-3 flex flex-col mt-auto border-2 border-slate-400">
-            <div className="w-full text-left pb-1 mb-1 border-b border-[#9aa3b4] flex justify-between items-center">
+      {/* ============ Model宇宙：常駐浮層語音球（可拖曳）＋對話框 ============ */}
+      <div
+        ref={floatRef}
+        className="fixed z-50 flex flex-col items-end gap-2"
+        style={orbPos ? { left: orbPos.x, top: orbPos.y } : { right: 20, bottom: 20 }}
+      >
+        {dialogOpen && (
+          <div className="mv-dialog w-72 hh-card rounded-lg p-3 flex flex-col gap-2 bg-white shadow-xl">
+            <div className="w-full pb-1 border-b border-[#9aa3b4] flex justify-between items-center">
+              {/* 不用 lucide 圖示：對話框會整個 unmount，lucide 換掉的節點會讓 React removeChild 炸掉 */}
               <span className="text-xs font-bold text-[#202731] flex items-center gap-1">
-                <i data-lucide="mic" className="w-3.5 h-3.5 text-[#0056b3]" />
+                <span className="text-[#0056b3]" aria-hidden="true">●</span>
                 MODEL宇宙 語音管家
               </span>
               <div className="flex items-center gap-1.5">
@@ -751,24 +943,21 @@ export default function Home() {
                 >
                   {voiceOn ? "🔊 語音開" : "🔇 語音關"}
                 </button>
+                <button
+                  type="button"
+                  onClick={closeDialog}
+                  title="收回對話框"
+                  className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-slate-300 hover:bg-slate-100"
+                >
+                  ✕
+                </button>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={onMic}
-              aria-pressed={mvListening}
-              className={`w-16 h-16 mx-auto my-1.5 rounded-full hh-softkey flex flex-col items-center justify-center border-2 border-[#596579] active:scale-95 shadow-md transition${mvListening ? " border-rose-500 bg-rose-100" : ""}`}
-            >
-              <i data-lucide="mic" className={`w-6 h-6 ${mvListening ? "text-rose-600" : "text-[#0056b3]"}`} />
-              <span className={`text-[9px] font-bold mt-0.5 ${mvListening ? "text-rose-800" : "text-slate-800"}`}>
-                {mvListening ? "聆聽中" : "點擊說話"}
-              </span>
-            </button>
             <div className="w-full p-2 bg-white rounded border border-slate-400 text-[11px] font-sans text-slate-800 leading-snug min-h-[52px]">
               {mvReply}
             </div>
             <form
-              className="mt-2 w-full flex gap-1.5"
+              className="w-full flex gap-1.5"
               onSubmit={(e) => {
                 e.preventDefault();
                 runModelCommand(mvDraft);
@@ -776,9 +965,11 @@ export default function Home() {
             >
               <input
                 ref={inputRef}
+                id="mv-command"
+                name="mv-command"
                 value={mvDraft}
                 onChange={(e) => setMvDraft(e.target.value)}
-                placeholder="打字，或點上面麥克風用講的"
+                placeholder="打字，或點宇宙球用講的"
                 autoComplete="off"
                 className="flex-1 rounded border border-slate-400 bg-white px-2 py-1.5 text-xs text-slate-800"
               />
@@ -786,20 +977,27 @@ export default function Home() {
                 送
               </button>
             </form>
-            <div className="mt-2 w-full flex flex-wrap gap-1">
-              {PRESET_COMMANDS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => runModelCommand(c)}
-                  className="hh-softkey rounded px-2 py-0.5 text-[10px] font-mono text-[#202731]"
-                >
-                  {c}
-                </button>
-              ))}
+            <div className="text-[10px] text-slate-400 font-mono leading-relaxed">
+              試試說：切手臂數據、查警報 414、開維修單、解除警報…
             </div>
           </div>
-        </aside>
+        )}
+        <button
+          type="button"
+          onMouseDown={handleOrbMouseDown}
+          onTouchStart={(e) => orbPress(e.touches[0].clientX, e.touches[0].clientY)}
+          onTouchMove={(e) => orbMove(e.touches[0].clientX, e.touches[0].clientY)}
+          onTouchEnd={orbRelease}
+          aria-pressed={mvListening}
+          aria-label="Model宇宙語音球：點一下說話，拖曳移動"
+          title="點一下說話，拖曳移動"
+          className={`mv-orb w-24 h-24 flex flex-col items-center justify-center gap-0.5${mvListening ? " listening" : ""}`}
+        >
+          <i data-lucide="mic" className="w-7 h-7 text-white drop-shadow" />
+          <span className="text-[10px] font-bold text-white drop-shadow">
+            {mvListening ? "聆聽中" : "宇宙"}
+          </span>
+        </button>
       </div>
 
       <footer className="bg-[#202731] text-slate-400 text-xs px-6 py-2 flex justify-between items-center border-t border-slate-700 font-mono">

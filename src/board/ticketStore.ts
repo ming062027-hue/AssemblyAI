@@ -22,6 +22,7 @@ export type TicketListener = (tickets: Ticket[]) => void;
 
 type TicketMessage =
   | { type: "ticket-created"; ticket: Ticket }
+  | { type: "ticket-resolved"; ticket: Ticket }
   | { type: "tickets-cleared" };
 
 function readStored(): Ticket[] {
@@ -75,6 +76,32 @@ export function add(ticket: Ticket): Ticket[] {
   const next = [...readStored(), ticket];
   writeStored(next);
   broadcast({ type: "ticket-created", ticket });
+  emitToLocal(next);
+  return next;
+}
+
+/**
+ * 派工包 v2 §4：把一張單標成已完成（status→resolved＋resolved_at），
+ * 寫回同一把 localStorage 鍵、走同一條 BroadcastChannel，
+ * /dashboard 靠既有 subscribe 自動同步，不用改看板檔。
+ * 找不到單號時回傳 null（不炸）。
+ */
+export function resolve(ticketId: string): Ticket[] | null {
+  const wanted = String(ticketId ?? "").trim().toUpperCase();
+  const stored = readStored();
+  const idx = stored.findIndex((t) => t.ticket_id.toUpperCase() === wanted);
+  if (idx < 0) return null;
+  const target = stored[idx];
+  if ((target.status ?? "open") === "resolved") return stored;
+  const done: Ticket = {
+    ...target,
+    status: "resolved",
+    resolved_at: new Date().toISOString(),
+  };
+  const next = [...stored];
+  next[idx] = done;
+  writeStored(next);
+  broadcast({ type: "ticket-resolved", ticket: done });
   emitToLocal(next);
   return next;
 }

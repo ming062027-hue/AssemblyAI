@@ -42,6 +42,10 @@ export interface Ticket {
   started?: string;
   alarm_code?: string;
   created_at: string;
+  // 工單生命週期（派工包 v2 §4）：open＝待修、resolved＝維修完成已解除。
+  // 舊單沒有 status 欄的一律視為 open。
+  status?: "open" | "resolved";
+  resolved_at?: string;
 }
 
 export interface HandlerError {
@@ -145,6 +149,17 @@ function notifyNewTicket(ticket: Ticket): void {
   }
 }
 
+function notifyTicketResolved(ticket: Ticket): void {
+  try {
+    if (typeof BroadcastChannel === "undefined") return;
+    const channel = new BroadcastChannel(TICKETS_CHANNEL);
+    channel.postMessage({ type: "ticket-resolved", ticket });
+    channel.close();
+  } catch {
+    // BroadcastChannel is best-effort: the ticket is already saved.
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Tool handlers. Success returns data; failure returns { error: "..." }.
 // ---------------------------------------------------------------------------
@@ -215,10 +230,60 @@ export function create_repair_ticket(args: {
     severity: args.severity,
     can_keep_running: args.can_keep_running,
     created_at: new Date().toISOString(),
+    status: "open",
   };
   if (args.started !== undefined) ticket.started = args.started;
   if (args.alarm_code !== undefined) ticket.alarm_code = args.alarm_code;
   storage.saveAll([...tickets, ticket]);
   notifyNewTicket(ticket);
   return { ticket_id: ticket.ticket_id, created_at: ticket.created_at };
+}
+
+// 派工包 v2 §4：維修完成→解除工單。status open→resolved＋resolved_at，
+// 同樣走 localStorage（鍵不變）＋BroadcastChannel（同頻道）同步 /dashboard。
+export function resolve_repair_ticket(args: {
+  ticket_id: string;
+}):
+  | { ticket_id: string; status: "resolved"; resolved_at: string }
+  | HandlerError {
+  const wanted = String(args?.ticket_id ?? "")
+    .trim()
+    .toUpperCase();
+  const storage = getStorage();
+  const tickets = storage.load();
+  const idx = tickets.findIndex(
+    (t) => t.ticket_id.toUpperCase() === wanted,
+  );
+  if (idx < 0) {
+    const openIds = tickets
+      .filter((t) => (t.status ?? "open") === "open")
+      .map((t) => t.ticket_id)
+      .join(", ");
+    return {
+      error: `Ticket ${String(args?.ticket_id)} not found.${openIds ? ` Open tickets: ${openIds}.` : " No open tickets."}`,
+    };
+  }
+  const target = tickets[idx];
+  if ((target.status ?? "open") === "resolved") {
+    return {
+      ticket_id: target.ticket_id,
+      status: "resolved",
+      resolved_at: target.resolved_at ?? target.created_at,
+    };
+  }
+  const resolved: Ticket = {
+    ...target,
+    status: "resolved",
+    resolved_at: new Date().toISOString(),
+  };
+  const next = [...tickets];
+  next[idx] = resolved;
+  storage.saveAll(next);
+  notifyTicketResolved(resolved);
+  const resolvedAt = resolved.resolved_at ?? new Date().toISOString();
+  return {
+    ticket_id: resolved.ticket_id,
+    status: "resolved",
+    resolved_at: resolvedAt,
+  };
 }
