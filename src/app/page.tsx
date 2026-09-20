@@ -161,7 +161,8 @@ export default function Home() {
     if (dialogTimer.current) clearTimeout(dialogTimer.current);
   }, []);
 
-  // 宇宙開口講話（瀏覽器內建 TTS，免費，優先用中文聲音）。
+  // 宇宙開口講話（瀏覽器內建 TTS，免費，固定 zh-TW 女聲、正常語速 rate=1.0）。
+  // 女聲挑法：zh 語音裡名字帶 女/female/常見女聲名 → Google 中文 → 第一個 zh。
   const speak = useCallback(
     (text: string) => {
       if (!voiceOn || typeof window === "undefined" || !window.speechSynthesis) return;
@@ -169,11 +170,17 @@ export default function Home() {
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
         u.lang = "zh-TW";
-        u.rate = 1.05;
-        const zh = window.speechSynthesis
-          .getVoices()
-          .find((v) => v.lang.toLowerCase().startsWith("zh"));
-        if (zh) u.voice = zh;
+        u.rate = 1.0;
+        const voices = window.speechSynthesis.getVoices();
+        const zh = voices.filter((v) => v.lang.toLowerCase().startsWith("zh"));
+        const pool = zh.filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith("zh-tw")).length
+          ? zh.filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith("zh-tw"))
+          : zh;
+        const female =
+          pool.find((v) => /女|female|mei-?jia|ting|yun|hsiao|ying|lin/i.test(v.name)) ??
+          pool.find((v) => /google/i.test(v.name)) ??
+          pool[0];
+        if (female) u.voice = female;
         window.speechSynthesis.speak(u);
       } catch {
         // TTS 失敗不致命
@@ -183,9 +190,11 @@ export default function Home() {
   );
 
   // 派工包 v2 §4：解除警報只有這一個函式。
-  // 語音「解除警報」＋警報面板按鈕＋F6 都接它：面板收回、04 轉正常。
+  // 語音「解除警報」＋警報面板按鈕＋F6 都接它：面板收回、04 轉正常、F3 的 J2 142% 一起清除。
+  // 語音上下文的 alarm 也清空，下一句「開維修單」不會再沿用舊警報。
   const clearAlarm = useCallback(() => {
     setIsAlarm(false);
+    setMvCtx(emptyContext());
     const msg = "警報已解除，04 加工區恢復正常，警報面板已收回。";
     setMvReply(msg);
     speak(msg);
@@ -257,6 +266,58 @@ export default function Home() {
     }
   }, [mvListening, runModelCommand, openDialog]);
 
+  // 浮層夾取：對話框＋球是同一個 fixed 容器，夾的是整個浮層（球在框下方，
+  // 只夾容器左上角會讓球掉出螢幕下緣 → 用容器實際寬高反推）。
+  const clampFloat = (x: number, y: number) => {
+    const w = floatRef.current?.offsetWidth ?? 300;
+    const h = floatRef.current?.offsetHeight ?? 420;
+    return {
+      x: Math.min(Math.max(x, 8), Math.max(8, window.innerWidth - w - 8)),
+      y: Math.min(Math.max(y, 8), Math.max(8, window.innerHeight - h - 8)),
+    };
+  };
+  // 對話框拖曳＋召回球：點/拖對話框就把整個浮層夾回可視範圍（球被拖出螢幕邊只剩對話框時用）。
+  const recallOrb = useCallback(() => {
+    setOrbPos((prev) => {
+      if (!prev) return prev;
+      const w = floatRef.current?.offsetWidth ?? 300;
+      const h = floatRef.current?.offsetHeight ?? 420;
+      return {
+        x: Math.min(Math.max(prev.x, 8), Math.max(8, window.innerWidth - w - 8)),
+        y: Math.min(Math.max(prev.y, 8), Math.max(8, window.innerHeight - h - 8)),
+      };
+    });
+  }, []);
+  const dialogDragRef = useRef<{
+    startX: number;
+    startY: number;
+    baseX: number;
+    baseY: number;
+  } | null>(null);
+  // 對話框標題列可拖著走（整個浮層一起動）；輸入框/按鈕不觸發拖曳。
+  const handleDialogMouseDown = (e: React.MouseEvent) => {
+    recallOrb();
+    if ((e.target as HTMLElement).closest("button,input,form")) return;
+    const rect = floatRef.current?.getBoundingClientRect();
+    dialogDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      baseX: rect ? rect.left : window.innerWidth - 320,
+      baseY: rect ? rect.top : window.innerHeight - 320,
+    };
+    const move = (ev: MouseEvent) => {
+      const d = dialogDragRef.current;
+      if (!d) return;
+      setOrbPos(clampFloat(d.baseX + ev.clientX - d.startX, d.baseY + ev.clientY - d.startY));
+    };
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      dialogDragRef.current = null;
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
   // 宇宙球拖曳：點一下＝說話（onMic），拖著走＝移動，放開停留在該處。
   const orbPress = (clientX: number, clientY: number) => {
     const rect = floatRef.current?.getBoundingClientRect();
@@ -275,9 +336,8 @@ export default function Home() {
     const dy = clientY - d.startY;
     if (Math.abs(dx) + Math.abs(dy) > 5) d.moved = true;
     if (d.moved) {
-      const x = Math.min(Math.max(d.baseX + dx, 8), window.innerWidth - 120);
-      const y = Math.min(Math.max(d.baseY + dy, 8), window.innerHeight - 120);
-      setOrbPos({ x, y });
+      const p = clampFloat(d.baseX + dx, d.baseY + dy);
+      setOrbPos(p);
     }
   };
   const orbRelease = () => {
@@ -686,9 +746,15 @@ export default function Home() {
                 <i data-lucide="activity" className="w-5 h-5 text-[#0056b3]" />
                 六軸機械手臂精細數據與扭矩頻譜分析 (ROBOT-02)
               </h2>
-              <span className="text-xs font-mono font-bold text-rose-700 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded">
-                E-402 OVER-TORQUE
-              </span>
+              {isAlarm ? (
+                <span className="text-xs font-mono font-bold text-rose-700 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded">
+                  E-402 OVER-TORQUE
+                </span>
+              ) : (
+                <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded">
+                  ALL AXES NORMAL
+                </span>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 font-mono">
               <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
@@ -703,6 +769,8 @@ export default function Home() {
                   <div>角度: +124.5°</div><div>轉速: 120 RPM</div><div>電流: 4.2 A</div><div>溫度: 42°C</div><div>振動: 0.8 mm/s</div><div className="text-emerald-700 font-bold">狀態: 正常</div>
                 </div>
               </div>
+              {/* J2：警報時 142% 紅卡；解除後跟著轉正常綠卡（跟語音說的同步） */}
+              {isAlarm ? (
               <div className="p-3 bg-rose-50 border-2 border-rose-500 rounded space-y-2 shadow-sm">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-black text-rose-900">J2 大臂俯仰軸 (SHOULDER)</span>
@@ -715,6 +783,20 @@ export default function Home() {
                   <div>角度: -48.2°</div><div>轉速: 0 RPM</div><div className="text-rose-700">電流: 18.9 A</div><div>溫度: 78°C</div><div>振動: 4.6 mm/s</div><div className="text-rose-700">狀態: 卡死鎖定</div>
                 </div>
               </div>
+              ) : (
+              <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-slate-800">J2 大臂俯仰軸 (SHOULDER)</span>
+                  <span className="font-bold text-emerald-700">36%</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                  <div className="bg-emerald-600 h-full rounded-full" style={{ width: "36%" }} />
+                </div>
+                <div className="grid grid-cols-3 text-[10px] text-slate-600 pt-1 border-t border-slate-200">
+                  <div>角度: -48.2°</div><div>轉速: 90 RPM</div><div>電流: 5.1 A</div><div>溫度: 45°C</div><div>振動: 0.9 mm/s</div><div className="text-emerald-700 font-bold">狀態: 正常</div>
+                </div>
+              </div>
+              )}
               <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-bold text-slate-800">J3 小臂關節軸 (ELBOW)</span>
@@ -770,7 +852,9 @@ export default function Home() {
                 機台專家系統診斷與即時排除建議：
               </div>
               <p className="text-slate-600 text-[11px] leading-relaxed">
-                J2 軸伺服扭矩於 13:10:02 發生階躍型過載（峰值達 142% 額定扭矩），系統已觸發硬體煞車安全連鎖。AI 研判內部減速機或導軌異物卡阻，已完成原廠緊急報修，工單單號：#TICKET-8902。
+                {isAlarm
+                  ? "J2 軸伺服扭矩於 13:10:02 發生階躍型過載（峰值達 142% 額定扭矩），系統已觸發硬體煞車安全連鎖。AI 研判內部減速機或導軌異物卡阻，已完成原廠緊急報修，工單單號：#TICKET-8902。"
+                  : "各軸負載正常（J2 回到 36%），無過載警報。歷史工單：#TICKET-8902（已結案）。"}
               </p>
             </div>
           </div>
@@ -917,15 +1001,22 @@ export default function Home() {
         </aside>
       </div>
 
-      {/* ============ Model宇宙：常駐浮層語音球（可拖曳）＋對話框 ============ */}
+      {/* ============ Model宇宙：常駐浮層語音球（可拖曳）＋對話框（球在框正下方置中） ============ */}
       <div
         ref={floatRef}
-        className="fixed z-50 flex flex-col items-end gap-2"
+        className="fixed z-50 flex flex-col items-center gap-2"
         style={orbPos ? { left: orbPos.x, top: orbPos.y } : { right: 20, bottom: 20 }}
       >
         {dialogOpen && (
-          <div className="mv-dialog w-72 hh-card rounded-lg p-3 flex flex-col gap-2 bg-white shadow-xl">
-            <div className="w-full pb-1 border-b border-[#9aa3b4] flex justify-between items-center">
+          <div
+            className="mv-dialog w-72 hh-card rounded-lg p-3 flex flex-col gap-2 bg-white shadow-xl"
+            onMouseDown={recallOrb}
+          >
+            <div
+              className="w-full pb-1 border-b border-[#9aa3b4] flex justify-between items-center cursor-move"
+              onMouseDown={handleDialogMouseDown}
+              title="拖這裡可以移動浮層"
+            >
               {/* 不用 lucide 圖示：對話框會整個 unmount，lucide 換掉的節點會讓 React removeChild 炸掉 */}
               <span className="text-xs font-bold text-[#202731] flex items-center gap-1">
                 <span className="text-[#0056b3]" aria-hidden="true">●</span>
@@ -978,7 +1069,7 @@ export default function Home() {
               </button>
             </form>
             <div className="text-[10px] text-slate-400 font-mono leading-relaxed">
-              試試說：切手臂數據、查警報 414、開維修單、解除警報…
+              試試說：F1、手臂數據、查警報 414、開維修單、解除警報…
             </div>
           </div>
         )}
@@ -991,12 +1082,10 @@ export default function Home() {
           aria-pressed={mvListening}
           aria-label="Model宇宙語音球：點一下說話，拖曳移動"
           title="點一下說話，拖曳移動"
-          className={`mv-orb w-24 h-24 flex flex-col items-center justify-center gap-0.5${mvListening ? " listening" : ""}`}
+          className={`mv-orb w-24 h-24 flex items-center justify-center${mvListening ? " listening" : ""}`}
         >
-          <i data-lucide="mic" className="w-7 h-7 text-white drop-shadow" />
-          <span className="text-[10px] font-bold text-white drop-shadow">
-            {mvListening ? "聆聽中" : "宇宙"}
-          </span>
+          {/* 球面只留星空漸層＋高光＋mic，不放文字 */}
+          <i data-lucide="mic" className="w-8 h-8 text-white drop-shadow" />
         </button>
       </div>
 

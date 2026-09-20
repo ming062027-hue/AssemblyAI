@@ -94,21 +94,25 @@ body {
   }
 }
 
-/* ===== Model宇宙 語音球：常駐浮層（銀河系配色＋3D＋呼吸＋可拖曳）===== */
+/* ===== Model宇宙 語音球：常駐浮層（星空漸層＋多層高光 3D＋呼吸＋可拖曳）=====
+   無外圈描線：立體感靠多層徑向漸層（頂光＋底影＋輪廓光）＋陰影堆疊。 */
 .mv-orb {
   position: relative;
   border-radius: 9999px;
   cursor: grab;
-  /* 銀河系：深藍紫漸層底＋多層徑向高光（3D 立體感） */
+  /* 星空球體：頂部高光 → 中段藍 → 底部深藍紫＋暗角＋下方輪廓光 */
   background:
-    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 26%),
-    radial-gradient(circle at 50% 42%, #bcd6ff 0%, #5b8def 24%, #2b3f9e 52%, #171a52 74%, #0a0c2e 100%);
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 24%),
+    radial-gradient(circle at 68% 20%, rgba(190, 210, 255, 0.35) 0%, rgba(190, 210, 255, 0) 30%),
+    radial-gradient(circle at 50% 42%, #c3d8ff 0%, #6b97f2 22%, #33479f 50%, #1a1d5c 72%, #0a0c2e 100%),
+    radial-gradient(circle at 50% 118%, rgba(140, 170, 255, 0.55) 0%, rgba(140, 170, 255, 0) 46%),
+    radial-gradient(circle at 82% 84%, rgba(0, 0, 8, 0.6) 0%, rgba(0, 0, 8, 0) 44%);
   box-shadow:
-    0 0 0 2px rgba(150, 180, 255, 0.55),
-    0 10px 28px rgba(10, 10, 60, 0.55),
-    0 0 44px 8px rgba(80, 110, 255, 0.5),
-    inset -10px -14px 28px rgba(5, 5, 30, 0.65),
-    inset 6px 8px 18px rgba(255, 255, 255, 0.25);
+    0 14px 30px rgba(5, 5, 35, 0.6),
+    0 0 46px 10px rgba(80, 110, 255, 0.45),
+    inset -12px -16px 30px rgba(4, 4, 25, 0.7),
+    inset 8px 10px 20px rgba(255, 255, 255, 0.28),
+    inset -4px -4px 12px rgba(120, 150, 255, 0.25);
   animation: mv-breathe 3.4s ease-in-out infinite;
   touch-action: none;
   user-select: none;
@@ -135,11 +139,10 @@ body {
 .mv-orb.listening {
   animation: mv-breathe 1.2s ease-in-out infinite;
   box-shadow:
-    0 0 0 2px rgba(255, 210, 140, 0.65),
-    0 10px 28px rgba(60, 30, 0, 0.55),
+    0 14px 30px rgba(60, 30, 0, 0.55),
     0 0 60px 12px rgba(255, 170, 60, 0.55),
-    inset -10px -14px 28px rgba(40, 15, 0, 0.6),
-    inset 6px 8px 18px rgba(255, 255, 255, 0.3);
+    inset -12px -16px 30px rgba(40, 15, 0, 0.6),
+    inset 8px 10px 20px rgba(255, 255, 255, 0.3);
 }
 @keyframes mv-breathe {
   0%, 100% { transform: scale(1); filter: brightness(1); }

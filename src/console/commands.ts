@@ -32,7 +32,7 @@ export const SCREENS: ScreenDef[] = [
   { key: "f2", code: "F2", name: "AGV 車隊調度", en: "AGV Fleet", keywords: ["agv", "車隊", "搬運", "調度", "無人車", "fleet"] },
   { key: "f3", code: "F3", name: "手臂軸向數據", en: "Robot Arm", keywords: ["手臂", "機械手臂", "軸", "數據", "扭矩", "伺服", "arm", "robot", "torque", "servo"] },
   { key: "f4", code: "F4", name: "原料庫存", en: "Inventory", keywords: ["庫存", "原料", "補料", "叫料", "材料", "inventory", "material", "stock"] },
-  { key: "f5", code: "F5", name: "AI 通話紀錄", en: "Call Log", keywords: ["通話", "紀錄", "外部", "採購", "報修紀錄", "電話", "call", "log"] },
+  { key: "f5", code: "F5", name: "AI 通話紀錄", en: "Call Log", keywords: ["通話", "通訊錄", "紀錄", "外部", "採購", "報修紀錄", "電話", "call", "log"] },
 ];
 
 export interface CommandContext {
@@ -63,9 +63,9 @@ export interface ActionDef {
   hint: string;
 }
 export const ACTIONS: ActionDef[] = [
-  { id: "nav.view", keywords: /流程|監控|總覽|戰情|手臂|arm|庫存|inventory|通話|call|agv|車隊/, hint: "切換 F1–F5 畫面" },
+  { id: "nav.view", keywords: /流程監控|通訊錄|切換|畫面|f ?[1-5]|流程|監控|總覽|戰情|手臂|arm|庫存|inventory|通話|call|agv|車隊/, hint: "切換 F1–F5 畫面（說編號或名稱都行）" },
   { id: "alarm.lookup", keywords: /警報|alarm|\d{3,4}/, hint: "查警報碼" },
-  { id: "alarm.clear", keywords: /解除警報|警報重置|清除警報|警報靜音|reset alarm|clear alarm|alarm reset|silence alarm/, hint: "解除警報" },
+  { id: "alarm.clear", keywords: /解除警報|警報重置|清除警報|警報靜音|靜音|f ?6|reset alarm|clear alarm|alarm reset|silence alarm|mute/, hint: "解除警報（F6）" },
   { id: "ticket.create", keywords: /開.*單|維修單|報修|repair|ticket/, hint: "開維修單" },
   { id: "ticket.resolve", keywords: /修好|維修完成|解除工單|完工|結案|fixed|resolved|done|complete/, hint: "維修完成解除工單" },
   { id: "agv.dispatch", keywords: /調度|補料|送料|出車|dispatch|agv/, hint: "AGV 調度補料" },
@@ -84,7 +84,7 @@ export const PRESET_COMMANDS: string[] = [
 
 const RE_TICKET = /(開.*單|維修單|報修|開單|repair|ticket)/i;
 const RE_RESOLVE = /(修好|維修完成|解除工單|完工|結案|fixed|resolved|\bdone\b|complete)/i;
-const RE_CLEAR_ALARM = /(解除警報|警報重置|清除警報|警報靜音|重置警報|reset alarm|clear alarm|alarm reset|silence alarm|mute alarm)/i;
+const RE_CLEAR_ALARM = /(解除警報|警報重置|清除警報|警報靜音|靜音|重置警報|f ?6|reset alarm|clear alarm|alarm reset|silence alarm|mute alarm)/i;
 const RE_AGV = /(調度|補料|送料|出車|派車|dispatch|agv)/i;
 const RE_SUPPLIER = /(催料|叫料|催促|缺料|供應商|supplier|order material|purchase)/i;
 const RE_MAINT = /(保養|維修紀錄|保養紀錄|maintenance|history)/i;
@@ -111,6 +111,23 @@ export function interpret(raw: string, ctx: CommandContext): CommandResult {
   const base: CommandResult = { navigate: null, response: "", context: { ...ctx }, actionId: null };
   if (!text) return { ...base, response: "我在聽，請說指令。" };
   const t = text.toLowerCase();
+
+  // F0) 短編號直跳：說 F1–F5 切對應畫面，F6＝警報靜音/解除（跟按鈕同一個功能）。
+  const fHit = t.match(/f\s?([1-6])\b/);
+  if (fHit) {
+    if (fHit[1] === "6") {
+      base.context.alarm = null;
+      return {
+        ...base,
+        actionId: "alarm.clear",
+        clearAlarm: true,
+        response: "警報已解除，04 加工區恢復正常，警報面板已收回。",
+      };
+    }
+    const key = `f${fHit[1]}` as ScreenKey;
+    const s = SCREENS.find((x) => x.key === key)!;
+    return { ...base, navigate: key, actionId: "nav.view", response: `好的，切換到「${s.name}」。` };
+  }
 
   // 0) 解除警報（派工包 v2 §4＋§7：語音/按鈕/F6 都走同一個 clearAlarm）。
   if (RE_CLEAR_ALARM.test(text)) {
@@ -267,7 +284,7 @@ export function interpret(raw: string, ctx: CommandContext): CommandResult {
     return { ...base, actionId: "chat.thanks", response: "不客氣，隨時吩咐。" };
   }
   if (/(你會什麼|會做什麼|能做什麼|幫助|功能|help)/i.test(text)) {
-    return { ...base, actionId: "chat.help", response: "我會查機台狀態、查警報碼（給你原因和三步檢查）、開維修單、解除警報、解除工單、調度 AGV、催料、切換 F1 到 F5 畫面。說「查警報 414」「解除警報」「RT-1001 修好了」試試。" };
+    return { ...base, actionId: "chat.help", response: "我會查機台狀態、查警報碼（給你原因和三步檢查）、開維修單、解除警報、解除工單、調度 AGV、催料、切換畫面。直接說 F1、F2、F3、F4、F5 跳畫面，F6 靜音解除警報；或說「查警報 414」「RT-1001 修好了」試試。" };
   }
 
   // 6) Fallback — never invents.
