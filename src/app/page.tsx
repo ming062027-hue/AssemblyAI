@@ -334,11 +334,11 @@ const LIGHT_DOT: Record<Light, string> = {
   amber: "bg-amber-500",
   red: "bg-rose-500",
 };
-function stationBadge(lights: Light[]): { label: string; cls: string } {
-  if (lights.includes("red")) return { label: "警報", cls: "text-rose-700" };
-  if (lights.includes("blue")) return { label: "搬運中", cls: "text-blue-700" };
-  if (lights.includes("amber")) return { label: "待命中", cls: "text-amber-700" };
-  return { label: "正常", cls: "text-emerald-700" };
+function stationBadge(lights: Light[], isEn?: boolean): { label: string; cls: string } {
+  if (lights.includes("red")) return { label: isEn ? "ALARM" : "警報", cls: "text-rose-700" };
+  if (lights.includes("blue")) return { label: isEn ? "TRANSIT" : "搬運中", cls: "text-blue-700" };
+  if (lights.includes("amber")) return { label: isEn ? "STANDBY" : "待命中", cls: "text-amber-700" };
+  return { label: isEn ? "NORMAL" : "正常", cls: "text-emerald-700" };
 }
 function SubDot({ light }: { light: Light }) {
   return (
@@ -933,7 +933,7 @@ export default function Home() {
                 {langMode === "en" ? "SMART FACTORY SYSTEM · Autonomous Operations Hub" : "SMART FACTORY SYSTEM · 智慧工廠總控系統"}
               </span>
               <span className="text-xs px-2 py-0.5 rounded bg-emerald-900/80 text-emerald-300 font-mono font-semibold border border-emerald-600">
-                AUTO RUN
+                {langMode === "en" ? "AUTO RUN" : "全自動運轉"}
               </span>
               <span className="text-xs px-2 py-0.5 rounded bg-blue-900/80 text-cyan-300 font-mono font-semibold border border-blue-600" title={`可用率 ${heartbeat.oeeAvailability}% · 表現率 ${heartbeat.oeePerformance}% · 品質率 ${heartbeat.oeeQuality}%`}>
                 OEE {heartbeat.oeeTotal}%
@@ -943,9 +943,9 @@ export default function Home() {
               </span>
             </div>
             <div className="text-[11px] text-slate-400 font-mono flex items-center gap-3 mt-0.5">
-              <span>MODE: FULL AUTONOMOUS</span>
+              <span>{langMode === "en" ? "MODE: FULL AUTONOMOUS" : "模式: 全自主連線運轉"}</span>
               <span>•</span>
-              <span>VIEW: {langMode === "en" ? TAB_NAMES_EN[view] : TAB_NAMES[view]}</span>
+              <span>{langMode === "en" ? "VIEW: " : "視圖: "}{langMode === "en" ? TAB_NAMES_EN[view] : TAB_NAMES[view]}</span>
               <span>•</span>
               <span className="text-slate-300">{langMode === "en" ? "WO: " : "工單: "}{heartbeat.workOrder} ({heartbeat.partName})</span>
             </div>
@@ -953,27 +953,51 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-2.5 font-mono text-xs flex-wrap">
-          {/* 🌐 國際比賽雙語切換按鈕 / Bilingual Hackathon Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              const next = langMode === "zh" ? "en" : "zh";
-              setLangMode(next);
-              const switchMsg = next === "en" ? "Switched to English voice & console mode." : "已切換至繁體中文語音與控制台模式。";
-              setMvReply(switchMsg);
-              speak(switchMsg, next);
-              openDialog();
-            }}
-            title="點擊切換 國際競賽英文模式 / 繁體中文現場模式 (Bilingual Toggle for Hackathon Judges)"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-mono font-bold transition shadow-sm ${
-              langMode === "en"
-                ? "bg-blue-600 border-blue-400 text-white hover:bg-blue-500 ring-2 ring-blue-300/40"
-                : "bg-slate-800 border-slate-600 text-slate-200 hover:bg-slate-700"
-            }`}
-          >
-            <span>🌐</span>
-            <span>{langMode === "en" ? "EN (English)" : "中文 (繁體)"}</span>
-          </button>
+          {/* 🌐 國際比賽雙語切換分段選擇器 / Segmented Bilingual Switcher */}
+          <div className="flex items-center bg-[#14181f] p-0.5 rounded border border-slate-700 text-xs font-mono shadow-sm">
+            <button
+              type="button"
+              onClick={() => {
+                if (langMode !== "zh") {
+                  setLangMode("zh");
+                  const switchMsg = "已切換為繁體中文現場模式。";
+                  setMvReply(switchMsg);
+                  speak(switchMsg, "zh");
+                  openDialog();
+                }
+              }}
+              title="切換至繁體中文現場模式（台灣工廠車間）"
+              className={`flex items-center gap-1 px-2.5 py-1 rounded font-bold transition ${
+                langMode === "zh"
+                  ? "bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400/50"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>🇹🇼</span>
+              <span>繁體中文</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (langMode !== "en") {
+                  setLangMode("en");
+                  const switchMsg = "Switched to English voice and console mode.";
+                  setMvReply(switchMsg);
+                  speak(switchMsg, "en");
+                  openDialog();
+                }
+              }}
+              title="Switch to English mode (for hackathon judges)"
+              className={`flex items-center gap-1 px-2.5 py-1 rounded font-bold transition ${
+                langMode === "en"
+                  ? "bg-blue-600 text-white shadow-sm ring-1 ring-blue-400/50"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>🇺🇸</span>
+              <span>English</span>
+            </button>
+          </div>
 
           {/* 免接觸「宇宙」語音喚醒開關（直接喊「宇宙」） */}
           <button
@@ -1006,19 +1030,19 @@ export default function Home() {
 
           <div className="flex items-center gap-1.5 bg-[#14181f] px-3 py-1.5 rounded border border-slate-700">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-emerald-400 font-bold">READY</span>
+            <span className="text-emerald-400 font-bold">{langMode === "en" ? "READY" : "正常連線"}</span>
           </div>
 
           <div className="flex items-center gap-1.5 bg-[#14181f] px-3 py-1.5 rounded border border-slate-700">
             {isAlarm ? (
               <>
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-                <span className="text-rose-400 font-bold">ALARM (1)</span>
+                <span className="text-rose-400 font-bold">{langMode === "en" ? "ALARM (1)" : "警報異常 (1)"}</span>
               </>
             ) : (
               <>
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                <span className="text-emerald-400 font-bold">NORMAL (0)</span>
+                <span className="text-emerald-400 font-bold">{langMode === "en" ? "NORMAL (0)" : "全線正常 (0)"}</span>
               </>
             )}
           </div>
@@ -1039,7 +1063,7 @@ export default function Home() {
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                 <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 whitespace-nowrap">
                   <i data-lucide="layers" className="w-3.5 h-3.5 text-[#0056b3]" />
-                  MES 工單配方:
+                  {langMode === "en" ? "MES Work Orders:" : "MES 工單配方:"}
                 </span>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <button
@@ -1051,7 +1075,7 @@ export default function Home() {
                         : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300"
                     }`}
                   >
-                    <span>A109 渦輪葉片</span>
+                    <span>{langMode === "en" ? "A109 Turbine Blade" : "A109 渦輪葉片"}</span>
                     <span className="text-[10px] opacity-80">(8.5k RPM)</span>
                   </button>
 
@@ -1064,7 +1088,7 @@ export default function Home() {
                         : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300"
                     }`}
                   >
-                    <span>B202 燃油閥體</span>
+                    <span>{langMode === "en" ? "B202 Fuel Valve" : "B202 燃油閥體"}</span>
                     <span className="text-[10px] opacity-80">(12k RPM)</span>
                   </button>
 
@@ -1077,7 +1101,7 @@ export default function Home() {
                         : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300"
                     }`}
                   >
-                    <span>C303 人工關節</span>
+                    <span>{langMode === "en" ? "C303 Hip Joint" : "C303 人工關節"}</span>
                     <span className="text-[10px] opacity-80">(6.8k RPM)</span>
                   </button>
                 </div>
@@ -1087,7 +1111,7 @@ export default function Home() {
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 border-t md:border-t-0 md:border-l md:pl-3 border-slate-200">
                 <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 whitespace-nowrap">
                   <i data-lucide="zap" className="w-3.5 h-3.5 text-rose-600" />
-                  1鍵故障演練:
+                  {langMode === "en" ? "Fault Simulation:" : "1鍵故障演練:"}
                 </span>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <button
@@ -1100,7 +1124,7 @@ export default function Home() {
                         : "bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-200"
                     }`}
                   >
-                    🚨 414 軸過載
+                    {langMode === "en" ? "🚨 414 Servo Overload" : "🚨 414 軸過載"}
                   </button>
 
                   <button
@@ -1113,7 +1137,7 @@ export default function Home() {
                         : "bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200"
                     }`}
                   >
-                    🌡️ E-108 主軸過溫
+                    {langMode === "en" ? "🌡️ E-108 Spindle Temp" : "🌡️ E-108 主軸過溫"}
                   </button>
 
                   <button
@@ -1126,7 +1150,7 @@ export default function Home() {
                         : "bg-sky-50 hover:bg-sky-100 text-sky-800 border-sky-200"
                     }`}
                   >
-                    💧 E-305 冷卻斷流
+                    {langMode === "en" ? "💧 E-305 Coolant Flow" : "💧 E-305 冷卻斷流"}
                   </button>
 
                   <button
@@ -1135,7 +1159,7 @@ export default function Home() {
                     title="解除所有故障演練與警報，恢復全線正常運作"
                     className="px-2 py-1 text-xs font-mono rounded border transition font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300 flex items-center gap-1"
                   >
-                    ✅ 復歸正常
+                    {langMode === "en" ? "✅ Reset Normal" : "✅ 復歸正常"}
                   </button>
                 </div>
               </div>
@@ -1150,13 +1174,15 @@ export default function Home() {
                   <span className="text-rose-800">— {heartbeat.faultDesc}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-slate-600 font-semibold hidden sm:inline">【演練中】喊「宇宙，解除警報」或點擊右側復歸</span>
+                  <span className="text-slate-600 font-semibold hidden sm:inline">
+                    {langMode === "en" ? "[Simulating] Say 'Universe, clear alarm' or click reset" : "【演練中】喊「宇宙，解除警報」或點擊右側復歸"}
+                  </span>
                   <button
                     type="button"
                     onClick={() => clearAlarm()}
                     className="px-2.5 py-1 bg-rose-700 hover:bg-rose-800 text-white rounded font-bold shadow-sm"
                   >
-                    手動復歸
+                    {langMode === "en" ? "Manual Reset" : "手動復歸"}
                   </button>
                 </div>
               </div>
@@ -1166,12 +1192,16 @@ export default function Home() {
               <div className="flex justify-between items-center pb-2 mb-2.5 border-b border-[#9aa3b4]">
                 <h2 className="text-sm font-bold flex items-center gap-2 text-[#202731]">
                   <i data-lucide="git-branch" className="w-4 h-4 text-[#0056b3]" />
-                  自動化製程全節點即時監控 · 動態物流流水線
+                  {langMode === "en" ? "Autonomous Manufacturing Pipeline · Live Material Conveyor" : "自動化製程全節點即時監控 · 動態物流流水線"}
                 </h2>
                 <div className="flex items-center gap-2 text-xs font-mono">
-                  <span className="text-slate-600 font-semibold">STATIONS: 5 ACTIVE</span>
+                  <span className="text-slate-600 font-semibold">
+                    {langMode === "en" ? "STATIONS: 5 ACTIVE" : "工站: 5 站連線運轉"}
+                  </span>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                  <span className="text-emerald-700 font-bold">FLOWING</span>
+                  <span className="text-emerald-700 font-bold">
+                    {langMode === "en" ? "FLOWING" : "連續流動中"}
+                  </span>
                 </div>
               </div>
 
@@ -1184,35 +1214,35 @@ export default function Home() {
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="font-bold text-[#0056b3] flex items-center gap-1">
                     <span className={`w-2 h-2 rounded-full ${isAlarm ? "bg-rose-500 animate-ping" : "bg-emerald-500 animate-pulse"}`} />
-                    即時物流動脈：
+                    {langMode === "en" ? "Material Pipeline: " : "即時物流動脈："}
                   </span>
                   <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-700">
-                    <span className="px-1.5 py-0.5 rounded bg-white border border-slate-300">01 碼頭進貨</span>
+                    <span className="px-1.5 py-0.5 rounded bg-white border border-slate-300">{langMode === "en" ? "01 Dock Inbound" : "01 碼頭進貨"}</span>
                     <span className="text-blue-600 font-bold flow-arrow-pulse">❯❯</span>
-                    <span className="px-1.5 py-0.5 rounded bg-white border border-slate-300">02 AGV入庫</span>
+                    <span className="px-1.5 py-0.5 rounded bg-white border border-slate-300">{langMode === "en" ? "02 AGV Inbound" : "02 AGV入庫"}</span>
                     <span className="text-blue-600 font-bold flow-arrow-pulse">❯❯</span>
-                    <span className="px-1.5 py-0.5 rounded bg-amber-100/90 border border-amber-300 text-amber-900 font-bold">03 取料急送</span>
+                    <span className="px-1.5 py-0.5 rounded bg-amber-100/90 border border-amber-300 text-amber-900 font-bold">{langMode === "en" ? "03 Buffer Feeder" : "03 取料急送"}</span>
                     <span className="text-blue-600 font-bold flow-arrow-pulse">❯❯</span>
                     <span className={`px-1.5 py-0.5 rounded border font-bold ${
                       isAlarm
                         ? "bg-rose-100 border-rose-400 text-rose-900 animate-pulse"
                         : "bg-emerald-100/80 border-emerald-300 text-emerald-900"
                     }`}>
-                      04 切削加工 {isAlarm ? "[鎖死]" : ""}
+                      {langMode === "en" ? `04 CNC Machining ${isAlarm ? "[LOCKED]" : ""}` : `04 切削加工 ${isAlarm ? "[鎖死]" : ""}`}
                     </span>
                     <span className="text-blue-600 font-bold flow-arrow-pulse">❯❯</span>
-                    <span className="px-1.5 py-0.5 rounded bg-white border border-slate-300">05 品檢入庫</span>
+                    <span className="px-1.5 py-0.5 rounded bg-white border border-slate-300">{langMode === "en" ? "05 QC Storage" : "05 品檢入庫"}</span>
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-[10px]">
-                  <span>輸送節拍: <strong className="text-slate-800">1.2 m/s</strong></span>
-                  <span>工廠生產週期: <strong className="text-slate-800">{formatSecondsToMS(heartbeat.cycleRemainSec)}</strong></span>
+                  <span>{langMode === "en" ? "Speed: " : "輸送節拍: "}<strong className="text-slate-800">1.2 m/s</strong></span>
+                  <span>{langMode === "en" ? "Cycle Time: " : "工廠生產週期: "}<strong className="text-slate-800">{formatSecondsToMS(heartbeat.cycleRemainSec)}</strong></span>
                   <span className={`px-2 py-0.5 rounded font-bold border ${
                     isAlarm
                       ? "bg-rose-100 text-rose-700 border-rose-300"
                       : "bg-emerald-100 text-emerald-800 border-emerald-300"
                   }`}>
-                    {isAlarm ? "⚠ 異常停擺" : "● 連續流動中"}
+                    {langMode === "en" ? (isAlarm ? "⚠ STOPPED" : "● FLOWING") : (isAlarm ? "⚠ 異常停擺" : "● 連續流動中")}
                   </span>
                 </div>
               </div>
@@ -1223,10 +1253,10 @@ export default function Home() {
                 <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[270px] shadow-sm hover:border-blue-400 transition">
                   <div className="flex justify-between text-[12px] font-mono font-bold items-center border-b border-slate-200 pb-1">
                     <span className="flex items-center gap-1.5 text-slate-800">
-                      <span>01 碼頭進貨</span>
+                      <span>{langMode === "en" ? "01 Dock Inbound" : "01 碼頭進貨"}</span>
                     </span>
                     {(() => {
-                      const b = stationBadge(["green", "green"]);
+                      const b = stationBadge(["green", "green"], langMode === "en");
                       return <span className={`${b.cls} flex items-center gap-1 text-[11px]`}>● {b.label}</span>;
                     })()}
                   </div>
@@ -1277,10 +1307,10 @@ export default function Home() {
                 <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[270px] shadow-sm hover:border-blue-400 transition">
                   <div className="flex justify-between text-[12px] font-mono font-bold items-center border-b border-slate-200 pb-1">
                     <span className="flex items-center gap-1.5 text-slate-800">
-                      <span>02 下貨入庫 AGV</span>
+                      <span>{langMode === "en" ? "02 Inbound Storage AGV" : "02 下貨入庫 AGV"}</span>
                     </span>
                     {(() => {
-                      const b = stationBadge(["blue", "blue"]);
+                      const b = stationBadge(["blue", "blue"], langMode === "en");
                       return <span className={`${b.cls} flex items-center gap-1 text-[11px]`}>● {b.label}</span>;
                     })()}
                   </div>
@@ -1342,10 +1372,10 @@ export default function Home() {
                 <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[270px] shadow-sm hover:border-blue-400 transition">
                   <div className="flex justify-between text-[12px] font-mono font-bold items-center border-b border-slate-200 pb-1">
                     <span className="flex items-center gap-1.5 text-slate-800">
-                      <span>03 取料 AGV</span>
+                      <span>{langMode === "en" ? "03 Buffer Feeder AGV" : "03 取料 AGV"}</span>
                     </span>
                     {(() => {
-                      const b = stationBadge(["blue", "amber"]);
+                      const b = stationBadge(["blue", "amber"], langMode === "en");
                       return <span className={`${b.cls} flex items-center gap-1 text-[11px]`}>● {b.label}</span>;
                     })()}
                   </div>
@@ -1404,10 +1434,10 @@ export default function Home() {
                     isAlarm ? "text-rose-800 border-rose-300" : "border-slate-200"
                   }`}>
                     <span className="flex items-center gap-1.5">
-                      <span>04 加工區</span>
+                      <span>{langMode === "en" ? "04 CNC Machining Area" : "04 加工區"}</span>
                     </span>
                     {(() => {
-                      const b = stationBadge(lights04);
+                      const b = stationBadge(lights04, langMode === "en");
                       return (
                         <span className={isAlarm ? "text-rose-700 animate-pulse font-black text-[11px]" : `${b.cls} text-[11px]`}>
                           ● {b.label}
@@ -1470,10 +1500,10 @@ export default function Home() {
                 <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[270px] shadow-sm hover:border-blue-400 transition">
                   <div className="flex justify-between text-[12px] font-mono font-bold items-center border-b border-slate-200 pb-1">
                     <span className="flex items-center gap-1.5 text-slate-800">
-                      <span>05 品檢入庫 AGV</span>
+                      <span>{langMode === "en" ? "05 QC Storage AGV" : "05 品檢入庫 AGV"}</span>
                     </span>
                     {(() => {
-                      const b = stationBadge(["green", "green"]);
+                      const b = stationBadge(["green", "green"], langMode === "en");
                       return <span className={`${b.cls} flex items-center gap-1 text-[11px]`}>● {b.label}</span>;
                     })()}
                   </div>
@@ -1523,14 +1553,16 @@ export default function Home() {
               <div className="flex justify-between items-center pb-2 mb-3 border-b border-[#9aa3b4]">
                 <h2 className="text-sm font-bold flex items-center gap-2 text-[#202731]">
                   <i data-lucide="cpu" className="w-4 h-4 text-[#0056b3]" />
-                  CNC-640 5軸高速加工中心 · 實體切削遙測與程式流
+                  {langMode === "en"
+                    ? "CNC-640 5-Axis Machining Center · Cutting Telemetry & G-Code Flow"
+                    : "CNC-640 5軸高速加工中心 · 實體切削遙測與程式流"}
                 </h2>
                 <div className="flex items-center gap-3 text-xs font-mono">
                   <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-300">
-                    刀具: <strong className="text-blue-700">{heartbeat.tools[2]?.id || "T03"}</strong> (R4 圓鼻銑刀)
+                    {langMode === "en" ? "Tool: " : "刀具: "}<strong className="text-blue-700">{heartbeat.tools[2]?.id || "T03"}</strong> {langMode === "en" ? "(R4 Bullnose Endmill)" : "(R4 圓鼻銑刀)"}
                   </span>
                   <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-300 font-bold">
-                    週期剩餘: {formatSecondsToMS(heartbeat.cycleRemainSec)} / 04:30
+                    {langMode === "en" ? "Cycle Remaining: " : "週期剩餘: "}{formatSecondsToMS(heartbeat.cycleRemainSec)} / 04:30
                   </span>
                 </div>
               </div>
@@ -1538,8 +1570,8 @@ export default function Home() {
               {/* 切削進度條 */}
               <div className="mb-3">
                 <div className="flex justify-between text-[11px] font-mono text-slate-600 mb-1">
-                  <span>單件切削進度 (CYCLE PROGRESS)</span>
-                  <span>{Math.round(((270 - heartbeat.cycleRemainSec) / 270) * 100)}% (完成將自動入庫並計數)</span>
+                  <span>{langMode === "en" ? "Single Part Cutting Progress (CYCLE PROGRESS)" : "單件切削進度 (CYCLE PROGRESS)"}</span>
+                  <span>{Math.round(((270 - heartbeat.cycleRemainSec) / 270) * 100)}% {langMode === "en" ? "(Auto storage on finish)" : "(完成將自動入庫並計數)"}</span>
                 </div>
                 <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
                   <div
@@ -2623,20 +2655,47 @@ export default function Home() {
               </div>
 
               <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = langMode === "zh" ? "en" : "zh";
-                    setLangMode(next);
-                    const msg = next === "en" ? "Switched to English voice mode." : "已切換為繁體中文語音模式。";
-                    setMvReply(msg);
-                    speak(msg, next);
-                  }}
-                  title="Switch language: English / 繁體中文"
-                  className="text-[10px] font-mono px-1.5 py-0.5 rounded border font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300"
-                >
-                  {langMode === "en" ? "🌐 EN" : "🌐 中"}
-                </button>
+                {/* 浮層內中英分段選擇器 */}
+                <div className="flex items-center bg-slate-100 rounded border border-slate-300 p-0.5 text-[10px] font-mono">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (langMode !== "zh") {
+                        setLangMode("zh");
+                        const msg = "已切換為繁體中文語音模式。";
+                        setMvReply(msg);
+                        speak(msg, "zh");
+                      }
+                    }}
+                    title="切換為繁體中文"
+                    className={`px-1.5 py-0.5 rounded font-bold transition ${
+                      langMode === "zh"
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    中
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (langMode !== "en") {
+                        setLangMode("en");
+                        const msg = "Switched to English voice mode.";
+                        setMvReply(msg);
+                        speak(msg, "en");
+                      }
+                    }}
+                    title="Switch to English"
+                    className={`px-1.5 py-0.5 rounded font-bold transition ${
+                      langMode === "en"
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    EN
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => setLiveModeWanted((prev) => !prev)}
