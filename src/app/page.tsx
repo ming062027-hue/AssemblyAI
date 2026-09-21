@@ -595,11 +595,11 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-2.5 font-mono text-xs flex-wrap">
-          {/* 免接觸「嘿宇宙」語音喚醒開關 */}
+          {/* 免接觸「宇宙」語音喚醒開關（直接喊「宇宙」） */}
           <button
             type="button"
             onClick={() => setWakeEnabled((v) => !v)}
-            title={wakeEnabled ? "免觸控語音喚醒中（黑手免碰螢幕，喊「嘿宇宙」即可）" : "免觸控語音喚醒已關閉，點擊開啟"}
+            title={wakeEnabled ? "免觸控語音喚醒中（黑手免碰螢幕，直接喊「宇宙」即可）" : "免觸控語音喚醒已關閉，點擊開啟"}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs font-mono font-semibold transition ${
               wakeEnabled
                 ? "bg-purple-950/80 border-purple-500 text-purple-200 hover:bg-purple-900"
@@ -607,7 +607,7 @@ export default function Home() {
             }`}
           >
             <span className={`w-2 h-2 rounded-full ${wakeEnabled ? "bg-purple-400 animate-pulse" : "bg-slate-500"}`} />
-            <span>🎙️ 嘿宇宙: {wakeEnabled ? "ON (免觸控)" : "OFF"}</span>
+            <span>🎙️ 語音喚醒: {wakeEnabled ? "ON (喊「宇宙」)" : "OFF"}</span>
           </button>
 
           {/* 停機損失即時跳表（老闆視角：每秒都在算錢） */}
@@ -648,157 +648,355 @@ export default function Home() {
           {/* ============ F1 流程監控總覽（放大五站 + 警報才出現的面板） ============ */}
           <div className={view === "f1" ? "space-y-4" : "space-y-4 hidden"}>
             <section className="hh-card rounded-lg p-4">
-              <div className="flex justify-between items-center pb-2 mb-3 border-b border-[#9aa3b4]">
+              <div className="flex justify-between items-center pb-2 mb-2.5 border-b border-[#9aa3b4]">
                 <h2 className="text-sm font-bold flex items-center gap-2 text-[#202731]">
                   <i data-lucide="git-branch" className="w-4 h-4 text-[#0056b3]" />
-                  自動化製程全節點即時監控
+                  自動化製程全節點即時監控 · 動態物流流水線
                 </h2>
-                <span className="text-xs font-mono font-semibold text-slate-600">STATIONS: 5 ACTIVE</span>
+                <div className="flex items-center gap-2 text-xs font-mono">
+                  <span className="text-slate-600 font-semibold">STATIONS: 5 ACTIVE</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                  <span className="text-emerald-700 font-bold">FLOWING</span>
+                </div>
               </div>
+
+              {/* 🏭 動態物流流向輸送管線 (LIVE MATERIAL CONVEYOR PIPELINE) */}
+              <div className={`p-2 rounded-md border flex flex-wrap items-center justify-between text-xs font-mono mb-3 gap-2 ${
+                isAlarm
+                  ? "bg-rose-950/10 border-rose-400 text-rose-800 flow-conveyor-alarm"
+                  : "bg-blue-50/70 border-blue-300 text-slate-700 flow-conveyor-track"
+              }`}>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-bold text-[#0056b3] flex items-center gap-1">
+                    <span className={`w-2 h-2 rounded-full ${isAlarm ? "bg-rose-500 animate-ping" : "bg-emerald-500 animate-pulse"}`} />
+                    即時物流動脈：
+                  </span>
+                  <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-700">
+                    <span className="px-1.5 py-0.5 rounded bg-white border border-slate-300">01 碼頭進貨</span>
+                    <span className="text-blue-600 font-bold flow-arrow-pulse">❯❯</span>
+                    <span className="px-1.5 py-0.5 rounded bg-white border border-slate-300">02 AGV入庫</span>
+                    <span className="text-blue-600 font-bold flow-arrow-pulse">❯❯</span>
+                    <span className="px-1.5 py-0.5 rounded bg-amber-100/90 border border-amber-300 text-amber-900 font-bold">03 取料急送</span>
+                    <span className="text-blue-600 font-bold flow-arrow-pulse">❯❯</span>
+                    <span className={`px-1.5 py-0.5 rounded border font-bold ${
+                      isAlarm
+                        ? "bg-rose-100 border-rose-400 text-rose-900 animate-pulse"
+                        : "bg-emerald-100/80 border-emerald-300 text-emerald-900"
+                    }`}>
+                      04 切削加工 {isAlarm ? "[鎖死]" : ""}
+                    </span>
+                    <span className="text-blue-600 font-bold flow-arrow-pulse">❯❯</span>
+                    <span className="px-1.5 py-0.5 rounded bg-white border border-slate-300">05 品檢入庫</span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-[10px]">
+                  <span>輸送節拍: <strong className="text-slate-800">1.2 m/s</strong></span>
+                  <span>工廠生產週期: <strong className="text-slate-800">{formatSecondsToMS(heartbeat.cycleRemainSec)}</strong></span>
+                  <span className={`px-2 py-0.5 rounded font-bold border ${
+                    isAlarm
+                      ? "bg-rose-100 text-rose-700 border-rose-300"
+                      : "bg-emerald-100 text-emerald-800 border-emerald-300"
+                  }`}>
+                    {isAlarm ? "⚠ 異常停擺" : "● 連續流動中"}
+                  </span>
+                </div>
+              </div>
+
+              {/* 五站卡片：保留大銘定稿全部文字與規格，全面賦予動態進度與即時物理心跳 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 font-sans">
                 {/* 01 碼頭進貨 */}
-                <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[260px]">
-                  <div className="flex justify-between text-[12px] font-mono font-bold">
-                    <span>01 碼頭進貨</span>
+                <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[270px] shadow-sm hover:border-blue-400 transition">
+                  <div className="flex justify-between text-[12px] font-mono font-bold items-center border-b border-slate-200 pb-1">
+                    <span className="flex items-center gap-1.5 text-slate-800">
+                      <span>01 碼頭進貨</span>
+                    </span>
                     {(() => {
                       const b = stationBadge(["green", "green"]);
-                      return <span className={b.cls}>● {b.label}</span>;
+                      return <span className={`${b.cls} flex items-center gap-1 text-[11px]`}>● {b.label}</span>;
                     })()}
                   </div>
                   <div className="flex-1 flex flex-col gap-2">
-                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
-                      <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center gap-1.5">
-                        <SubDot light="green" />A 碼頭進貨
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5"><SubDot light="green" />A 碼頭進貨</span>
+                          <span className="text-[9px] font-mono text-emerald-700 font-bold bg-emerald-50 px-1 rounded">卸貨中</span>
+                        </div>
+                        <div className="text-[10px] text-slate-600 leading-relaxed font-mono">
+                          司機 AA｜車牌 BBB-123<br />10:00 碼頭下貨<br />1 號 AGV 來下貨
+                        </div>
                       </div>
-                      <div className="text-[10px] text-slate-600 leading-relaxed font-mono">
-                        司機 AA｜車牌 BBB-123<br />10:00 碼頭下貨<br />1 號 AGV 來下貨
+                      {/* 動態卸貨進度條 */}
+                      <div className="mt-1.5 pt-1 border-t border-slate-200">
+                        <div className="flex justify-between text-[9px] font-mono text-slate-500 mb-0.5">
+                          <span>卸載進度 (裝載AGV-01)</span>
+                          <span className="text-blue-700 font-bold">{heartbeat.dockAProgress}%</span>
+                        </div>
+                        <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-emerald-600 h-full rounded-full transition-all duration-1000"
+                            style={{ width: `${heartbeat.dockAProgress}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
-                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
-                      <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center gap-1.5">
-                        <SubDot light="green" />B 碼頭進貨
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5"><SubDot light="green" />B 碼頭進貨</span>
+                          <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1 rounded">待命中</span>
+                        </div>
+                        <div className="text-[10px] text-slate-600 leading-relaxed font-mono">
+                          司機 BB｜車牌 CCC-456<br />15:00 到碼頭<br />2 號 AGV 來下貨
+                        </div>
                       </div>
-                      <div className="text-[10px] text-slate-600 leading-relaxed font-mono">
-                        司機 BB｜車牌 CCC-456<br />15:00 到碼頭<br />2 號 AGV 來下貨
+                      <div className="mt-1 pt-1 border-t border-slate-200 text-[9px] text-slate-500 font-mono flex justify-between">
+                        <span>過磅狀態</span>
+                        <span className="text-emerald-700 font-bold">過磅完成</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* 02 下貨入庫 AGV */}
-                <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[260px]">
-                  <div className="flex justify-between text-[12px] font-mono font-bold">
-                    <span>02 下貨入庫 AGV</span>
+                <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[270px] shadow-sm hover:border-blue-400 transition">
+                  <div className="flex justify-between text-[12px] font-mono font-bold items-center border-b border-slate-200 pb-1">
+                    <span className="flex items-center gap-1.5 text-slate-800">
+                      <span>02 下貨入庫 AGV</span>
+                    </span>
                     {(() => {
                       const b = stationBadge(["blue", "blue"]);
-                      return <span className={b.cls}>● {b.label}</span>;
+                      return <span className={`${b.cls} flex items-center gap-1 text-[11px]`}>● {b.label}</span>;
                     })()}
                   </div>
                   <div className="flex-1 flex flex-col gap-2">
-                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
-                      <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center gap-1.5">
-                        <SubDot light="blue" />1 號 AGV
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5"><SubDot light="blue" />1 號 AGV</span>
+                          <span className="text-[9px] font-mono text-blue-700 font-bold bg-blue-50 px-1 rounded animate-pulse">運送中</span>
+                        </div>
+                        <div className="text-[10px] text-slate-600 leading-relaxed">
+                          確認司機車牌 · 碼頭<br />品名/數量/材質/供應商<br />
+                          <span className="font-mono font-bold text-slate-800">入庫 A 櫃 2-1</span>
+                        </div>
                       </div>
-                      <div className="text-[10px] text-slate-600 leading-relaxed">
-                        確認司機車牌 · 碼頭<br />品名/數量/材質/供應商<br />
-                        <span className="font-mono font-bold text-slate-800">入庫 A 櫃 2-1</span>
+                      {/* 動態 AGV 搬運進度條 */}
+                      <div className="mt-1.5 pt-1 border-t border-slate-200">
+                        <div className="flex justify-between text-[9px] font-mono text-slate-500 mb-0.5">
+                          <span>碼頭A ➔ A櫃 2-1</span>
+                          <span className="text-blue-700 font-bold">{heartbeat.agv1Progress}%</span>
+                        </div>
+                        <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-blue-600 h-full rounded-full transition-all duration-1000"
+                            style={{ width: `${heartbeat.agv1Progress}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
-                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
-                      <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center gap-1.5">
-                        <SubDot light="blue" />2 號 AGV
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5"><SubDot light="blue" />2 號 AGV</span>
+                          <span className="text-[9px] font-mono text-blue-700 font-bold bg-blue-50 px-1 rounded">運送中</span>
+                        </div>
+                        <div className="text-[10px] text-slate-600 leading-relaxed">
+                          確認司機車牌 · 碼頭<br />品名/數量/材質/供應商<br />
+                          <span className="font-mono font-bold text-slate-800">入庫 B 櫃 1-1</span>
+                        </div>
                       </div>
-                      <div className="text-[10px] text-slate-600 leading-relaxed">
-                        確認司機車牌 · 碼頭<br />品名/數量/材質/供應商<br />
-                        <span className="font-mono font-bold text-slate-800">入庫 B 櫃 1-1</span>
+                      {/* 動態 AGV 搬運進度條 */}
+                      <div className="mt-1.5 pt-1 border-t border-slate-200">
+                        <div className="flex justify-between text-[9px] font-mono text-slate-500 mb-0.5">
+                          <span>碼頭B ➔ B櫃 1-1</span>
+                          <span className="text-blue-700 font-bold">{heartbeat.agv2Progress}%</span>
+                        </div>
+                        <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-blue-600 h-full rounded-full transition-all duration-1000"
+                            style={{ width: `${heartbeat.agv2Progress}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* 03 取料 AGV：1 號手臂物料區補料中＝藍燈（派工包 v2 §3） */}
-                <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[260px]">
-                  <div className="flex justify-between text-[12px] font-mono font-bold">
-                    <span>03 取料 AGV</span>
+                <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[270px] shadow-sm hover:border-blue-400 transition">
+                  <div className="flex justify-between text-[12px] font-mono font-bold items-center border-b border-slate-200 pb-1">
+                    <span className="flex items-center gap-1.5 text-slate-800">
+                      <span>03 取料 AGV</span>
+                    </span>
                     {(() => {
                       const b = stationBadge(["blue", "amber"]);
-                      return <span className={b.cls}>● {b.label}</span>;
+                      return <span className={`${b.cls} flex items-center gap-1 text-[11px]`}>● {b.label}</span>;
                     })()}
                   </div>
                   <div className="flex-1 flex flex-col gap-2">
-                    <div className="p-2 rounded bg-amber-50 border border-amber-300 flex-1">
-                      <div className="text-[11px] font-bold text-amber-800 mb-1 flex items-center gap-1.5">
-                        <SubDot light="blue" />1 號手臂物料區 · 補料中
+                    <div className="p-2 rounded bg-amber-50 border-2 border-amber-400 flex-1 flex flex-col justify-between shadow-sm">
+                      <div>
+                        <div className="text-[11px] font-bold text-amber-900 mb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5"><SubDot light="blue" />1 號手臂物料區 · 補料中</span>
+                          <span className="text-[9px] font-mono text-rose-700 font-bold bg-rose-50 px-1 rounded animate-pulse">急送中</span>
+                        </div>
+                        <div className="text-[10px] text-slate-800 leading-relaxed">
+                          <span className="text-rose-700 font-black">低於下限 · 補貨</span><br />
+                          鋁鋼｜100 支｜S45C<br />
+                          <span className="font-mono font-bold text-slate-900">B 櫃 1-1</span>
+                        </div>
                       </div>
-                      <div className="text-[10px] text-slate-700 leading-relaxed">
-                        <span className="text-rose-700 font-bold">低於下限 · 補貨</span><br />
-                        鋁鋼｜100 支｜S45C<br />
-                        <span className="font-mono font-bold text-slate-800">B 櫃 1-1</span>
+                      {/* 動態補料進度條 */}
+                      <div className="mt-1.5 pt-1 border-t border-amber-200">
+                        <div className="flex justify-between text-[9px] font-mono text-amber-900 mb-0.5">
+                          <span>急件配送中 (預計28s)</span>
+                          <span className="text-amber-800 font-bold">{heartbeat.feedDeliveryProgress}%</span>
+                        </div>
+                        <div className="w-full bg-amber-200 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-amber-600 h-full rounded-full transition-all duration-1000"
+                            style={{ width: `${heartbeat.feedDeliveryProgress}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
-                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
-                      <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center gap-1.5">
-                        <SubDot light="amber" />2 號手臂物料區
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5"><SubDot light="amber" />2 號手臂物料區</span>
+                          <span className="text-[9px] font-mono text-emerald-700 bg-emerald-50 px-1 rounded font-bold">充沛</span>
+                        </div>
+                        <div className="text-[10px] text-emerald-700 font-bold leading-relaxed">
+                          原料正常<br />待命中
+                        </div>
                       </div>
-                      <div className="text-[10px] text-emerald-700 font-bold leading-relaxed">
-                        原料正常<br />待命中
+                      <div className="mt-1 pt-1 border-t border-slate-200 text-[9px] text-slate-500 font-mono flex justify-between">
+                        <span>目前庫存</span>
+                        <span className="text-emerald-700 font-bold">100% 滿足</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* 04 加工區（正常 / 警報）：子項燈號跟著 isAlarm 走 */}
-                <div className={`p-3 rounded flex flex-col gap-2 min-h-[260px] ${isAlarm ? "bg-rose-50 border-2 border-rose-600 shadow-sm" : "bg-white/70 border border-[#9aa3b4]"}`}>
-                  <div className={`flex justify-between text-[12px] font-mono font-bold ${isAlarm ? "text-rose-800" : ""}`}>
-                    <span>04 加工區</span>
+                <div className={`p-3 rounded flex flex-col gap-2 min-h-[270px] transition ${
+                  isAlarm
+                    ? "bg-rose-50 border-2 border-rose-600 shadow-md animate-pulse"
+                    : "bg-white/70 border border-[#9aa3b4] shadow-sm hover:border-blue-400"
+                }`}>
+                  <div className={`flex justify-between text-[12px] font-mono font-bold items-center border-b pb-1 ${
+                    isAlarm ? "text-rose-800 border-rose-300" : "border-slate-200"
+                  }`}>
+                    <span className="flex items-center gap-1.5">
+                      <span>04 加工區</span>
+                    </span>
                     {(() => {
                       const b = stationBadge(lights04);
                       return (
-                        <span className={isAlarm ? "text-rose-700 animate-pulse font-black" : b.cls}>
+                        <span className={isAlarm ? "text-rose-700 animate-pulse font-black text-[11px]" : `${b.cls} text-[11px]`}>
                           ● {b.label}
                         </span>
                       );
                     })()}
                   </div>
                   <div className="flex-1 flex flex-col gap-2">
-                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
-                      <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center gap-1.5">
-                        <SubDot light="green" />1 號機械手臂 · AE800
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5"><SubDot light="green" />1 號機械手臂 · AE800</span>
+                          <span className="text-[9px] font-mono text-emerald-700 font-bold bg-emerald-50 px-1 rounded animate-pulse">切削中</span>
+                        </div>
+                        <div className="text-[10px] text-slate-600 leading-relaxed">物料區 › 自檢成品 › 成品區</div>
                       </div>
-                      <div className="text-[10px] text-slate-600 leading-relaxed">物料區 › 自檢成品 › 成品區</div>
+                      {/* 與真實 CNC 物理切削倒數連動 */}
+                      <div className="mt-1.5 pt-1 border-t border-slate-200">
+                        <div className="flex justify-between text-[9px] font-mono text-slate-500 mb-0.5">
+                          <span>五軸切削: {heartbeat.activeGCode.n}</span>
+                          <span className="text-blue-700 font-bold">{Math.round(((270 - heartbeat.cycleRemainSec) / 270) * 100)}%</span>
+                        </div>
+                        <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-[#0056b3] h-full rounded-full transition-all duration-1000"
+                            style={{ width: `${Math.round(((270 - heartbeat.cycleRemainSec) / 270) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className={`p-2 rounded border flex-1 ${isAlarm ? "bg-rose-100 border-rose-300" : "bg-slate-50 border-slate-200"}`}>
-                      <div className={`text-[11px] font-bold mb-1 flex items-center gap-1.5 ${isAlarm ? "text-rose-900" : "text-[#0056b3]"}`}>
-                        <SubDot light={lights04[1]} />2 號機械手臂 · AF800{isAlarm ? "：E-402" : ""}
+                    <div className={`p-2 rounded border flex-1 flex flex-col justify-between ${
+                      isAlarm ? "bg-rose-100 border-rose-300" : "bg-slate-50 border-slate-200"
+                    }`}>
+                      <div>
+                        <div className={`text-[11px] font-bold mb-1 flex items-center justify-between ${
+                          isAlarm ? "text-rose-900" : "text-[#0056b3]"
+                        }`}>
+                          <span className="flex items-center gap-1.5"><SubDot light={lights04[1]} />2 號機械手臂 · AF800{isAlarm ? "：E-402" : ""}</span>
+                          <span className={`text-[9px] font-mono px-1 rounded font-bold ${
+                            isAlarm ? "bg-rose-200 text-rose-900 animate-pulse" : "bg-slate-100 text-slate-600"
+                          }`}>
+                            {isAlarm ? "伺服鎖定" : "自檢待命"}
+                          </span>
+                        </div>
+                        <div className={`text-[10px] leading-relaxed ${isAlarm ? "text-rose-700 font-bold" : "text-slate-600"}`}>
+                          {isAlarm ? "J2 伺服過載 142%" : "物料區 › 自檢成品 › 成品區"}
+                        </div>
                       </div>
-                      <div className={`text-[10px] leading-relaxed ${isAlarm ? "text-rose-700 font-bold" : "text-slate-600"}`}>
-                        {isAlarm ? "J2 伺服過載 142%" : "物料區 › 自檢成品 › 成品區"}
+                      <div className="mt-1 pt-1 border-t border-slate-200 text-[9px] text-slate-500 font-mono flex justify-between">
+                        <span>運作狀態</span>
+                        <span className={isAlarm ? "text-rose-700 font-bold" : "text-emerald-700 font-bold"}>
+                          {isAlarm ? "連鎖煞車觸發" : "正常"}
+                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* 05 品檢入庫 AGV */}
-                <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[260px]">
-                  <div className="flex justify-between text-[12px] font-mono font-bold">
-                    <span>05 品檢入庫 AGV</span>
+                <div className="p-3 bg-white/70 border border-[#9aa3b4] rounded flex flex-col gap-2 min-h-[270px] shadow-sm hover:border-blue-400 transition">
+                  <div className="flex justify-between text-[12px] font-mono font-bold items-center border-b border-slate-200 pb-1">
+                    <span className="flex items-center gap-1.5 text-slate-800">
+                      <span>05 品檢入庫 AGV</span>
+                    </span>
                     {(() => {
                       const b = stationBadge(["green", "green"]);
-                      return <span className={b.cls}>● {b.label}</span>;
+                      return <span className={`${b.cls} flex items-center gap-1 text-[11px]`}>● {b.label}</span>;
                     })()}
                   </div>
                   <div className="flex-1 flex flex-col gap-2">
-                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
-                      <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center gap-1.5">
-                        <SubDot light="green" />3 號 AGV · 1 號手臂
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5"><SubDot light="green" />3 號 AGV · 1 號手臂</span>
+                          <span className="text-[9px] font-mono text-emerald-700 font-bold bg-emerald-50 px-1 rounded animate-pulse">送檢中</span>
+                        </div>
+                        <div className="text-[10px] text-slate-600 leading-relaxed">成品區搬運 › 品檢區</div>
                       </div>
-                      <div className="text-[10px] text-slate-600 leading-relaxed">成品區搬運 › 品檢區</div>
+                      {/* 動態送檢進度條 */}
+                      <div className="mt-1.5 pt-1 border-t border-slate-200">
+                        <div className="flex justify-between text-[9px] font-mono text-slate-500 mb-0.5">
+                          <span>成品送檢: Part #{heartbeat.partsToday}</span>
+                          <span className="text-emerald-700 font-bold">{heartbeat.qcDeliveryProgress}%</span>
+                        </div>
+                        <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-emerald-600 h-full rounded-full transition-all duration-1000"
+                            style={{ width: `${heartbeat.qcDeliveryProgress}%` }}
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1">
-                      <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center gap-1.5">
-                        <SubDot light="green" />4 號 AGV · 2 號手臂
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5"><SubDot light="green" />4 號 AGV · 2 號手臂</span>
+                          <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1 rounded">待命</span>
+                        </div>
+                        <div className="text-[10px] text-slate-600 leading-relaxed">成品區搬運 › 品檢區</div>
                       </div>
-                      <div className="text-[10px] text-slate-600 leading-relaxed">成品區搬運 › 品檢區</div>
+                      <div className="mt-1 pt-1 border-t border-slate-200 text-[9px] text-slate-500 font-mono flex justify-between">
+                        <span>品檢三次元</span>
+                        <span className="text-emerald-700 font-bold">校正就緒</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1745,7 +1943,7 @@ export default function Home() {
                 name="mv-command"
                 value={mvDraft}
                 onChange={(e) => setMvDraft(e.target.value)}
-                placeholder="輸入語音指令或點擊宇宙球用講的..."
+                placeholder="輸入指令，或直接喊「宇宙」用講的..."
                 autoComplete="off"
                 className="flex-1 rounded border border-slate-400 bg-white px-2 py-1.5 text-xs text-slate-800 focus:outline-blue-500"
               />
@@ -1767,8 +1965,8 @@ export default function Home() {
           onTouchMove={(e) => orbMove(e.touches[0].clientX, e.touches[0].clientY)}
           onTouchEnd={orbRelease}
           aria-pressed={bridge.status === "listening" || mvListening}
-          aria-label="Model宇宙語音球：點一下啟動官方語音管家，拖曳移動"
-          title="點一下啟動官方語音管家，拖曳移動"
+          aria-label="Model宇宙語音球：直接喊「宇宙」或點擊對話，拖曳移動"
+          title="直接喊「宇宙」或點擊對話，拖曳移動"
           className={`mv-orb w-24 h-24 flex items-center justify-center cursor-pointer transition-transform active:scale-95 ${
             bridge.status === "listening" || mvListening ? "listening " : ""
           }${bridge.status === "speaking" ? "speaking " : ""}${

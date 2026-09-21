@@ -86,6 +86,12 @@ export interface FactoryHeartbeatState {
   tools: ToolItem[];
   agv1Progress: number;
   agv2Progress: number;
+
+  // 五站動態流水線即時進度
+  dockAProgress: number;
+  feedDeliveryProgress: number;
+  qcDeliveryProgress: number;
+  flowStage: number;
 }
 
 export function useFactoryHeartbeat(isAlarm: boolean): FactoryHeartbeatState {
@@ -109,6 +115,12 @@ export function useFactoryHeartbeat(isAlarm: boolean): FactoryHeartbeatState {
   // AGV 進度
   const [agv1Prog, setAgv1Prog] = useState(68);
   const [agv2Prog, setAgv2Prog] = useState(32);
+
+  // 五站動態流水線各站進度
+  const [dockAProg, setDockAProg] = useState(76);
+  const [feedProg, setFeedProg] = useState(82);
+  const [qcProg, setQcProg] = useState(55);
+  const [flowStage, setFlowStage] = useState(4);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -135,6 +147,12 @@ export function useFactoryHeartbeat(isAlarm: boolean): FactoryHeartbeatState {
         // AGV 移動巡航
         setAgv1Prog((prev) => (prev >= 100 ? 0 : prev + 2));
         setAgv2Prog((prev) => (prev >= 100 ? 0 : prev + 1));
+
+        // 五站動態流水線推進
+        setDockAProg((prev) => (prev >= 100 ? 15 : prev + 1));
+        setFeedProg((prev) => (prev >= 100 ? 10 : prev + 2));
+        setQcProg((prev) => (prev >= 100 ? 0 : prev + 3));
+        setFlowStage((prev) => (prev >= 5 ? 1 : prev + 1));
       }
     }, 1000);
 
@@ -195,6 +213,10 @@ export function useFactoryHeartbeat(isAlarm: boolean): FactoryHeartbeatState {
     tools: INITIAL_TOOLS,
     agv1Progress: agv1Prog,
     agv2Progress: agv2Prog,
+    dockAProgress: dockAProg,
+    feedDeliveryProgress: feedProg,
+    qcDeliveryProgress: qcProg,
+    flowStage,
   };
 }
 
