@@ -26,7 +26,7 @@ for (const n of ["get_machine_status", "lookup_alarm", "get_maintenance_history"
   if (!s0Names.includes(n)) fail(`TOOLS_S0 缺 ${n}`);
 }
 if (s0Names.includes("create_repair_ticket")) fail("TOOLS_S0 不該含 create_repair_ticket");
-for (const n of [...s0Names, "create_repair_ticket"]) {
+for (const n of [...s0Names, "create_repair_ticket", "resolve_repair_ticket"]) {
   if (!s1Names.includes(n)) fail(`TOOLS_S1 缺 ${n}`);
 }
 if (errors === 0) pass("S0/S1 組合正確");

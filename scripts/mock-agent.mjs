@@ -52,6 +52,18 @@ function route(text) {
     };
   }
 
+  if (lower.includes("resolve") || lower.includes("resolved") || lower.includes("clear ticket") || lower.includes("fixed")) {
+    const hit = lower.match(/rt-?\d{4}/i);
+    const num = hit ? hit[0].replace(/[^0-9]/g, "") : "1001";
+    const ticketId = `RT-${num}`;
+    return {
+      action: "resolve",
+      tool: "resolve_repair_ticket",
+      arguments: { ticket_id: ticketId },
+      agent: [`Repair ticket ${ticketId} has been resolved and closed. Anything else?`],
+    };
+  }
+
   const machineHit = lower.match(MACHINE_RE);
   const rest = machineHit ? lower.replace(machineHit[0], " ") : lower;
 
@@ -188,6 +200,9 @@ function runSelfTest() {
 
   r = route("Yes, confirm.");
   eq("yes -> create_repair_ticket", [r.tool, r.arguments?.operator_confirmed], ["create_repair_ticket", "yes"]);
+
+  r = route("Ticket RT-1001 is resolved.");
+  eq("resolve -> resolve_repair_ticket", [r.tool, r.arguments?.ticket_id], ["resolve_repair_ticket", "RT-1001"]);
 
   r = route("That's all, thanks.");
   eq("that's-all -> end_conversation", r.tool, "end_conversation");
