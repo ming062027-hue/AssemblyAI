@@ -52,6 +52,15 @@ function route(text) {
     };
   }
 
+  if (/(clear|reset).*alarm|alarm.*(clear|reset)|解除.*警報/.test(lower)) {
+    return {
+      action: "clear_alarm",
+      tool: "clear_machine_alarm",
+      arguments: { machine_id: "M03" },
+      agent: ["Machine alarm has been cleared and reset. System status returned to normal."],
+    };
+  }
+
   if (lower.includes("resolve") || lower.includes("resolved") || lower.includes("clear ticket") || lower.includes("fixed")) {
     const hit = lower.match(/rt-?\d{4}/i);
     const num = hit ? hit[0].replace(/[^0-9]/g, "") : "1001";
@@ -61,6 +70,47 @@ function route(text) {
       tool: "resolve_repair_ticket",
       arguments: { ticket_id: ticketId },
       agent: [`Repair ticket ${ticketId} has been resolved and closed. Anything else?`],
+    };
+  }
+
+  if (/\barms?\b|\btorque\b|\bf3\b|手臂/.test(lower)) {
+    return {
+      action: "switch_view",
+      tool: "switch_console_view",
+      arguments: { view: "f3" },
+      agent: ["Switching console display to robotic arm torque telemetry."],
+    };
+  }
+  if (/\bcoolant\b|\braw material\b|\bf4\b|庫存|切削液/.test(lower)) {
+    return {
+      action: "switch_view",
+      tool: "switch_console_view",
+      arguments: { view: "f4" },
+      agent: ["Switching console display to raw material inventory and coolant levels."],
+    };
+  }
+  if (/\bfleet\b|\bagvs?\b|\bf2\b|車隊/.test(lower)) {
+    return {
+      action: "switch_view",
+      tool: "switch_console_view",
+      arguments: { view: "f2" },
+      agent: ["Switching console display to AGV fleet dispatch."],
+    };
+  }
+  if (/\boverview\b|\bprocess\b|\bf1\b|總覽/.test(lower)) {
+    return {
+      action: "switch_view",
+      tool: "switch_console_view",
+      arguments: { view: "f1" },
+      agent: ["Switching console display to process overview."],
+    };
+  }
+  if (/\bshow tickets\b|\bf5\b|通訊/.test(lower)) {
+    return {
+      action: "switch_view",
+      tool: "switch_console_view",
+      arguments: { view: "f5" },
+      agent: ["Switching console display to repair tickets and external contacts."],
     };
   }
 
@@ -203,6 +253,12 @@ function runSelfTest() {
 
   r = route("Ticket RT-1001 is resolved.");
   eq("resolve -> resolve_repair_ticket", [r.tool, r.arguments?.ticket_id], ["resolve_repair_ticket", "RT-1001"]);
+
+  r = route("Switch to robotic arm torque telemetry.");
+  eq("arm -> switch_console_view f3", [r.tool, r.arguments?.view], ["switch_console_view", "f3"]);
+
+  r = route("Clear machine alarm.");
+  eq("clear alarm -> clear_machine_alarm", [r.tool, r.arguments?.machine_id], ["clear_machine_alarm", "M03"]);
 
   r = route("That's all, thanks.");
   eq("that's-all -> end_conversation", r.tool, "end_conversation");

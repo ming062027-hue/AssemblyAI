@@ -16,6 +16,14 @@ import {
   type CommandContext,
 } from "@/console/commands";
 import { subscribe, list, type Ticket } from "@/board/ticketStore";
+import { useVoiceAgentBridge } from "@/voice/useVoiceAgentBridge";
+import {
+  get_machine_status,
+  lookup_alarm,
+  get_maintenance_history,
+  create_repair_ticket,
+  resolve_repair_ticket,
+} from "@/tools/handlers";
 
 declare global {
   interface Window {
@@ -98,6 +106,11 @@ export default function Home() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<SpeechRec | null>(null);
 
+  // Live vs Mock mode settings
+  const [liveModeWanted, setLiveModeWanted] = useState(false);
+  const [passcode, setPasscode] = useState("414");
+  const [showConfig, setShowConfig] = useState(false);
+
   // Model宇宙 常駐浮層：平時只剩球，對話框講話時才彈出、說完自動收回。
   const [dialogOpen, setDialogOpen] = useState(false);
   const dialogTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -112,51 +125,11 @@ export default function Home() {
     moved: boolean;
   } | null>(null);
 
-  useEffect(() => {
-    const id = setInterval(() => {
-      setClock(new Date().toLocaleTimeString("zh-TW", { hour12: false }));
-    }, 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  useEffect(() => subscribe(setTickets), []);
-
-  useEffect(
-    () => () => {
-      if (msgTimer.current) clearTimeout(msgTimer.current);
-      if (dialogTimer.current) clearTimeout(dialogTimer.current);
-    },
-    [],
-  );
-
-  const refreshIcons = useCallback(() => {
-    window.lucide?.createIcons();
-  }, []);
-
-  useEffect(() => {
-    refreshIcons();
-  }, [view, mvListening, isAlarm, tickets, refreshIcons]);
-
-  const switchTab = useCallback((key: ViewKey) => setView(key), []);
-
-  const dispatchAgv = useCallback((id: string, task: string) => {
-    setAgvMsg(`[調度完成] ${id} 收到指令：『${task}』。`);
-    if (msgTimer.current) clearTimeout(msgTimer.current);
-    msgTimer.current = setTimeout(() => setAgvMsg(null), 3500);
-  }, []);
-
-  const callSupplierManual = useCallback((mat: string) => {
-    setUrgeCount((n) => n + 1);
-    setSupplierMsg(`[AI通話完成] 已致電供應商催促『${mat}』，工單已建立。`);
-    if (msgTimer.current) clearTimeout(msgTimer.current);
-    msgTimer.current = setTimeout(() => setSupplierMsg(null), 4000);
-  }, []);
-
-  // 對話框：打開後 6 秒沒新訊息自動收回，只剩球。
+  // 對話框：打開後 10 秒沒新訊息自動收回，只剩球。
   const openDialog = useCallback(() => {
     setDialogOpen(true);
     if (dialogTimer.current) clearTimeout(dialogTimer.current);
-    dialogTimer.current = setTimeout(() => setDialogOpen(false), 6000);
+    dialogTimer.current = setTimeout(() => setDialogOpen(false), 10000);
   }, []);
 
   const closeDialog = useCallback(() => {
@@ -164,9 +137,68 @@ export default function Home() {
     if (dialogTimer.current) clearTimeout(dialogTimer.current);
   }, []);
 
+  // Hook up official Voice Agent Bridge
+  const bridge = useVoiceAgentBridge({
+    isDev: process.env.NODE_ENV !== "production",
+    mockUrl: "ws://localhost:8787",
+    onToolCall: async (name, args) => {
+      openDialog();
+      if (name === "switch_console_view") {
+        const v = String(args.view ?? "f1").toLowerCase() as ViewKey;
+        if (["f1", "f2", "f3", "f4", "f5"].includes(v)) {
+          setView(v);
+          return { success: true, active_view: v, view_name: TAB_NAMES[v] };
+        }
+        return { error: `Invalid view: ${String(args.view)}` };
+      }
+      if (name === "clear_machine_alarm") {
+        setIsAlarm(false);
+        setMvCtx(emptyContext());
+        return { success: true, message: "Alarm cleared. Machine returned to normal." };
+      }
+      if (name === "lookup_alarm") {
+        const res = lookup_alarm({
+          alarm_code: String(args.alarm_code ?? ""),
+          machine_id: args.machine_id ? String(args.machine_id) : undefined,
+        });
+        if (!("error" in res)) {
+          setIsAlarm(true);
+          setView("f1");
+        }
+        return res as unknown as Record<string, unknown>;
+      }
+      if (name === "get_machine_status") {
+        return get_machine_status({ machine_id: String(args.machine_id ?? "M03") }) as unknown as Record<string, unknown>;
+      }
+      if (name === "get_maintenance_history") {
+        return get_maintenance_history({
+          machine_id: String(args.machine_id ?? "M03"),
+          limit: typeof args.limit === "number" ? args.limit : 3,
+        }) as unknown as Record<string, unknown>;
+      }
+      if (name === "create_repair_ticket") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const res = create_repair_ticket(args as any);
+        setTickets(list());
+        return res as unknown as Record<string, unknown>;
+      }
+      if (name === "resolve_repair_ticket") {
+        const res = resolve_repair_ticket({ ticket_id: String(args.ticket_id ?? "") });
+        setTickets(list());
+        return res as unknown as Record<string, unknown>;
+      }
+      if (name === "end_conversation") {
+        return { success: true };
+      }
+      return { error: `Unknown tool ${name}` };
+    },
+    onSessionReady: () => {
+      openDialog();
+    },
+  });
+
   // 宇宙開口講話（瀏覽器內建 TTS，免費，固定 zh-TW 女聲、正常語速 rate=1.0；
   // 英文模式改用 en-US 聲音，語速一樣 1.0）。
-  // 女聲挑法：zh 語音裡名字帶 女/female/常見女聲名 → Google 中文 → 第一個 zh。
   const speak = useCallback(
     (text: string, lang: "zh" | "en" = "zh") => {
       if (!voiceOn || typeof window === "undefined" || !window.speechSynthesis) return;
@@ -204,6 +236,63 @@ export default function Home() {
     [voiceOn],
   );
 
+  useEffect(() => {
+    const id = setInterval(() => {
+      setClock(new Date().toLocaleTimeString("zh-TW", { hour12: false }));
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => subscribe(setTickets), []);
+
+  useEffect(
+    () => () => {
+      if (msgTimer.current) clearTimeout(msgTimer.current);
+      if (dialogTimer.current) clearTimeout(dialogTimer.current);
+    },
+    [],
+  );
+
+  const refreshIcons = useCallback(() => {
+    window.lucide?.createIcons();
+  }, []);
+
+  useEffect(() => {
+    refreshIcons();
+  }, [view, mvListening, isAlarm, tickets, bridge.status, refreshIcons]);
+
+  useEffect(() => {
+    if (bridge.lastAgentSay) {
+      setMvReply(bridge.lastAgentSay);
+      openDialog();
+      if (voiceOn && !bridge.isLiveMode) {
+        speak(bridge.lastAgentSay, "en");
+      }
+    }
+  }, [bridge.lastAgentSay, bridge.isLiveMode, voiceOn, speak, openDialog]);
+
+  useEffect(() => {
+    if (bridge.lastUserSay) {
+      setMvDraft(bridge.lastUserSay);
+      openDialog();
+    }
+  }, [bridge.lastUserSay, openDialog]);
+
+  const switchTab = useCallback((key: ViewKey) => setView(key), []);
+
+  const dispatchAgv = useCallback((id: string, task: string) => {
+    setAgvMsg(`[調度完成] ${id} 收到指令：『${task}』。`);
+    if (msgTimer.current) clearTimeout(msgTimer.current);
+    msgTimer.current = setTimeout(() => setAgvMsg(null), 3500);
+  }, []);
+
+  const callSupplierManual = useCallback((mat: string) => {
+    setUrgeCount((n) => n + 1);
+    setSupplierMsg(`[AI通話完成] 已致電供應商催促『${mat}』，工單已建立。`);
+    if (msgTimer.current) clearTimeout(msgTimer.current);
+    msgTimer.current = setTimeout(() => setSupplierMsg(null), 4000);
+  }, []);
+
   // 派工包 v2 §4：解除警報只有這一個函式。
   // 語音「解除警報」＋警報面板按鈕＋F6 都接它：面板收回、04 轉正常、F3 的 J2 142% 一起清除。
   // 語音上下文的 alarm 也清空，下一句「開維修單」不會再沿用舊警報。
@@ -214,7 +303,10 @@ export default function Home() {
     setMvReply(msg);
     speak(msg);
     openDialog();
-  }, [speak, openDialog]);
+    if (bridge.status === "listening" || bridge.status === "speaking" || bridge.status === "thinking") {
+      bridge.sendSay("clear machine alarm");
+    }
+  }, [speak, openDialog, bridge]);
 
   const runModelCommand = useCallback(
     (text: string) => {
@@ -243,6 +335,36 @@ export default function Home() {
     [mvCtx, urgeCount, speak, openDialog, dispatchAgv, callSupplierManual],
   );
 
+  const toggleVoiceSession = useCallback(async () => {
+    openDialog();
+    if (bridge.status === "idle" || bridge.status === "ended" || bridge.status === "error") {
+      await bridge.startCall(passcode, liveModeWanted);
+    } else {
+      bridge.endCall();
+    }
+  }, [bridge, passcode, liveModeWanted, openDialog]);
+
+  const sendQuick = useCallback(
+    (txt: string) => {
+      const line = txt.trim();
+      if (!line) return;
+      openDialog();
+      if (bridge.status === "listening" || bridge.status === "speaking" || bridge.status === "thinking") {
+        bridge.sendSay(line);
+      } else {
+        void (async () => {
+          const ok = await bridge.startCall(passcode, liveModeWanted);
+          if (ok) {
+            setTimeout(() => bridge.sendSay(line), 400);
+          } else {
+            runModelCommand(line);
+          }
+        })();
+      }
+    },
+    [bridge, passcode, liveModeWanted, openDialog, runModelCommand],
+  );
+
   // 開機巡檢：載入後自動掃 5 站＋庫存＋待修單，宇宙開場報告＋問從哪開始。
   // 延遲 1.5 秒等 TTS 聲音載入；警報站（M03）存在時直接亮紅燈＋推播。
   useEffect(() => {
@@ -264,6 +386,13 @@ export default function Home() {
 
   // 點麥克風：用瀏覽器內建語音辨識（Chrome 免費）真的聽你講中文。
   const onMic = useCallback(() => {
+    if (liveModeWanted || bridge.isLiveMode) {
+      void toggleVoiceSession();
+      return;
+    }
+    if (bridge.status === "idle" || bridge.status === "ended" || bridge.status === "error") {
+      void bridge.startCall(passcode, false);
+    }
     if (mvListening) {
       recognitionRef.current?.stop();
       setMvListening(false);
@@ -287,7 +416,11 @@ export default function Home() {
     rec.onresult = (e) => {
       const transcript = e.results[0][0].transcript;
       setMvDraft(transcript);
-      runModelCommand(transcript);
+      if (bridge.status === "listening" || bridge.status === "speaking" || bridge.status === "thinking") {
+        bridge.sendSay(transcript);
+      } else {
+        runModelCommand(transcript);
+      }
     };
     rec.onend = () => setMvListening(false);
     rec.onerror = () => setMvListening(false);
@@ -299,7 +432,7 @@ export default function Home() {
     } catch {
       setMvListening(false);
     }
-  }, [mvListening, runModelCommand, openDialog]);
+  }, [liveModeWanted, bridge, passcode, mvListening, toggleVoiceSession, openDialog, runModelCommand]);
 
   // 浮層夾取：對話框＋球是同一個 fixed 容器，夾的是整個浮層（球在框下方，
   // 只夾容器左上角會讓球掉出螢幕下緣 → 用容器實際寬高反推）。
@@ -1044,49 +1177,225 @@ export default function Home() {
       >
         {dialogOpen && (
           <div
-            className="mv-dialog w-72 hh-card rounded-lg p-3 flex flex-col gap-2 bg-white shadow-xl"
+            className="mv-dialog w-[340px] hh-card rounded-lg p-3 flex flex-col gap-2.5 bg-white shadow-2xl border-2 border-[#7e889b]"
             onMouseDown={recallOrb}
           >
+            {/* 標題列：可拖曳浮層 */}
             <div
-              className="w-full pb-1 border-b border-[#9aa3b4] flex justify-between items-center cursor-move"
+              className="w-full pb-1.5 border-b border-[#9aa3b4] flex justify-between items-center cursor-move"
               onMouseDown={handleDialogMouseDown}
               title="拖這裡可以移動浮層"
             >
-              {/* 不用 lucide 圖示：對話框會整個 unmount，lucide 換掉的節點會讓 React removeChild 炸掉 */}
-              <span className="text-xs font-bold text-[#202731] flex items-center gap-1">
-                <span className="text-[#0056b3]" aria-hidden="true">●</span>
-                MODEL宇宙 語音管家
-              </span>
               <div className="flex items-center gap-1.5">
-                <div className={mvListening ? "flex items-center gap-1" : "hidden items-center gap-1"}>
-                  <span className="wave-bar" /><span className="wave-bar" /><span className="wave-bar" /><span className="wave-bar" />
-                </div>
+                <span className="text-[#0056b3] text-sm" aria-hidden="true">●</span>
+                <span className="text-xs font-bold text-[#202731]">
+                  MODEL宇宙 語音管家
+                </span>
+                {bridge.status === "listening" && (
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 animate-pulse">
+                    LISTENING
+                  </span>
+                )}
+                {bridge.status === "thinking" && (
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 animate-pulse">
+                    THINKING
+                  </span>
+                )}
+                {bridge.status === "speaking" && (
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 animate-pulse">
+                    SPEAKING
+                  </span>
+                )}
+                {bridge.status === "connecting" && (
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 animate-pulse">
+                    CONNECTING
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setLiveModeWanted((prev) => !prev)}
+                  title={liveModeWanted ? "目前為 AssemblyAI 真人模式，點擊切換為 Mock 模擬模式" : "目前為 Mock 模擬模式，點擊切換為 AssemblyAI 真人模式"}
+                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded border font-semibold ${
+                    liveModeWanted
+                      ? "bg-purple-100 text-purple-800 border-purple-300"
+                      : "bg-slate-100 text-slate-700 border-slate-300"
+                  }`}
+                >
+                  {liveModeWanted ? "⚡ Live" : "🤖 Mock"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowConfig((prev) => !prev)}
+                  title="連線設定"
+                  className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-slate-300 hover:bg-slate-100 text-slate-700"
+                >
+                  ⚙
+                </button>
                 <button
                   type="button"
                   onClick={() => setVoiceOn((v) => !v)}
                   title="開關宇宙的語音回覆"
                   className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-slate-300 hover:bg-slate-100"
                 >
-                  {voiceOn ? "🔊 語音開" : "🔇 語音關"}
+                  {voiceOn ? "🔊" : "🔇"}
                 </button>
                 <button
                   type="button"
                   onClick={closeDialog}
                   title="收回對話框"
-                  className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-slate-300 hover:bg-slate-100"
+                  className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-slate-300 hover:bg-slate-100 text-slate-700"
                 >
                   ✕
                 </button>
               </div>
             </div>
-            <div className="w-full p-2 bg-white rounded border border-slate-400 text-[11px] font-sans text-slate-800 leading-snug min-h-[52px]">
-              {mvReply}
+
+            {/* 設定展開區塊 */}
+            {showConfig && (
+              <div className="p-2 bg-slate-50 border border-slate-200 rounded text-[11px] flex flex-col gap-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-slate-700">語音後端模式：</span>
+                  <span className="font-mono text-[10px] text-slate-500">
+                    {liveModeWanted ? "AssemblyAI Voice Agent API" : "Local Mock (ws://localhost:8787)"}
+                  </span>
+                </div>
+                {liveModeWanted && (
+                  <div className="flex items-center gap-1.5">
+                    <label htmlFor="passcode-input" className="text-slate-600 font-mono text-[10px]">
+                      Passcode:
+                    </label>
+                    <input
+                      id="passcode-input"
+                      type="password"
+                      value={passcode}
+                      onChange={(e) => setPasscode(e.target.value)}
+                      placeholder="預設 414"
+                      className="flex-1 px-1.5 py-0.5 rounded border border-slate-300 font-mono text-xs"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 通話控制列 */}
+            <div className="flex justify-between items-center text-[11px] px-1 font-mono">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    bridge.status === "listening" || bridge.status === "speaking"
+                      ? "bg-emerald-500 animate-ping"
+                      : bridge.status === "connecting" || bridge.status === "thinking"
+                        ? "bg-amber-500 animate-pulse"
+                        : "bg-slate-400"
+                  }`}
+                />
+                <span className="text-slate-600 font-semibold">
+                  {bridge.status === "listening"
+                    ? `語音連線中 (${bridge.seconds}s)`
+                    : bridge.status === "speaking"
+                      ? `語音回話中 (${bridge.seconds}s)`
+                      : bridge.status === "thinking"
+                        ? "AI 決策執行中..."
+                        : bridge.status === "connecting"
+                          ? "連線建立中..."
+                          : "語音助理待命中"}
+                </span>
+              </div>
+              <div>
+                {bridge.status === "idle" || bridge.status === "ended" || bridge.status === "error" ? (
+                  <button
+                    type="button"
+                    onClick={() => void toggleVoiceSession()}
+                    className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px]"
+                  >
+                    ▶ 連線對話
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => bridge.endCall()}
+                    className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px]"
+                  >
+                    ⏹ 掛斷
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* 對話訊息區塊 */}
+            <div className="w-full p-2.5 bg-slate-50/90 rounded border border-slate-300 text-[11px] font-sans text-slate-800 leading-snug min-h-[60px] flex flex-col gap-1.5 max-h-[160px] overflow-y-auto">
+              {bridge.lastUserSay && (
+                <div className="text-blue-900 bg-blue-50/80 p-1.5 rounded border border-blue-200">
+                  <span className="font-bold">👤 操作員：</span>
+                  {bridge.lastUserSay}
+                </div>
+              )}
+              {bridge.lastAgentSay ? (
+                <div className="text-slate-900 bg-emerald-50/60 p-1.5 rounded border border-emerald-200">
+                  <span className="font-bold text-emerald-800">🤖 MODEL宇宙：</span>
+                  {bridge.lastAgentSay}
+                </div>
+              ) : (
+                !bridge.lastUserSay && <div className="text-slate-700">{mvReply}</div>
+              )}
+              {bridge.error && (
+                <div className="text-rose-700 bg-rose-50 p-1.5 rounded border border-rose-300 text-[10px] font-mono">
+                  ⚠ {bridge.error}
+                </div>
+              )}
+            </div>
+
+            {/* 快速語音指令膠囊（裁判 / 現場 1-click 測試） */}
+            <div className="flex flex-wrap gap-1">
+              <button
+                type="button"
+                onClick={() => sendQuick("What does alarm 414 mean?")}
+                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
+              >
+                🔍 查 414 警報
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("Switch console view to robotic arm")}
+                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
+              >
+                🦾 F3 手臂軸向
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("Open a repair ticket for machine 3")}
+                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
+              >
+                📝 開立維修單
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("Clear machine alarm")}
+                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-rose-100 hover:border-rose-300 text-slate-700 border border-slate-300 transition"
+              >
+                🔕 解除警報
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("Resolve repair ticket RT-1001")}
+                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-emerald-100 hover:border-emerald-300 text-slate-700 border border-slate-300 transition"
+              >
+                ✅ 解除 RT-1001
+              </button>
+            </div>
+
+            {/* 打字輸入框 */}
             <form
               className="w-full flex gap-1.5"
               onSubmit={(e) => {
                 e.preventDefault();
-                runModelCommand(mvDraft);
+                const line = mvDraft.trim();
+                if (!line) return;
+                setMvDraft("");
+                sendQuick(line);
               }}
             >
               <input
@@ -1095,32 +1404,47 @@ export default function Home() {
                 name="mv-command"
                 value={mvDraft}
                 onChange={(e) => setMvDraft(e.target.value)}
-                placeholder="打字，或點宇宙球用講的"
+                placeholder="輸入語音指令或點擊宇宙球用講的..."
                 autoComplete="off"
-                className="flex-1 rounded border border-slate-400 bg-white px-2 py-1.5 text-xs text-slate-800"
+                className="flex-1 rounded border border-slate-400 bg-white px-2 py-1.5 text-xs text-slate-800 focus:outline-blue-500"
               />
-              <button type="submit" className="rounded bg-[#0056b3] hover:bg-blue-700 px-2.5 py-1.5 text-xs font-bold text-white">
-                送
+              <button
+                type="submit"
+                className="rounded bg-[#0056b3] hover:bg-blue-700 px-3 py-1.5 text-xs font-bold text-white transition"
+              >
+                送出
               </button>
             </form>
-            <div className="text-[10px] text-slate-400 font-mono leading-relaxed">
-              試試說：查警報 414、開維修單、耗材還夠嗎、今日報表、交班…
-            </div>
           </div>
         )}
+
+        {/* 宇宙球主體 */}
         <button
           type="button"
           onMouseDown={handleOrbMouseDown}
           onTouchStart={(e) => orbPress(e.touches[0].clientX, e.touches[0].clientY)}
           onTouchMove={(e) => orbMove(e.touches[0].clientX, e.touches[0].clientY)}
           onTouchEnd={orbRelease}
-          aria-pressed={mvListening}
-          aria-label="Model宇宙語音球：點一下說話，拖曳移動"
-          title="點一下說話，拖曳移動"
-          className={`mv-orb w-24 h-24 flex items-center justify-center${mvListening ? " listening" : ""}${isAlarm ? " alarm" : ""}`}
+          aria-pressed={bridge.status === "listening" || mvListening}
+          aria-label="Model宇宙語音球：點一下啟動官方語音管家，拖曳移動"
+          title="點一下啟動官方語音管家，拖曳移動"
+          className={`mv-orb w-24 h-24 flex items-center justify-center cursor-pointer transition-transform active:scale-95 ${
+            bridge.status === "listening" || mvListening ? "listening " : ""
+          }${bridge.status === "speaking" ? "speaking " : ""}${
+            bridge.status === "thinking" ? "thinking " : ""
+          }${isAlarm ? "alarm " : ""}`}
         >
-          {/* 球面只留星空漸層＋高光＋mic，不放文字 */}
-          <i data-lucide="mic" className="w-8 h-8 text-white drop-shadow" />
+          {/* 球面星空漸層＋高光＋圖示 */}
+          <i
+            data-lucide={
+              bridge.status === "speaking"
+                ? "volume-2"
+                : bridge.status === "thinking"
+                  ? "cpu"
+                  : "mic"
+            }
+            className="w-8 h-8 text-white drop-shadow"
+          />
         </button>
       </div>
 

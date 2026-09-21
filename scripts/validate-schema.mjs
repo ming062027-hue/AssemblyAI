@@ -22,7 +22,14 @@ console.log(`TOOLS_S1: ${TOOLS_S1.map((t) => t.name).join(", ")}`);
 
 const s0Names = TOOLS_S0.map((t) => t.name);
 const s1Names = TOOLS_S1.map((t) => t.name);
-for (const n of ["get_machine_status", "lookup_alarm", "get_maintenance_history", "end_conversation"]) {
+for (const n of [
+  "get_machine_status",
+  "lookup_alarm",
+  "get_maintenance_history",
+  "end_conversation",
+  "switch_console_view",
+  "clear_machine_alarm",
+]) {
   if (!s0Names.includes(n)) fail(`TOOLS_S0 缺 ${n}`);
 }
 if (s0Names.includes("create_repair_ticket")) fail("TOOLS_S0 不該含 create_repair_ticket");

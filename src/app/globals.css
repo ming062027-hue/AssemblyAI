@@ -144,6 +144,22 @@ body {
     inset -12px -16px 30px rgba(40, 15, 0, 0.6),
     inset 8px 10px 20px rgba(255, 255, 255, 0.3);
 }
+.mv-orb.speaking {
+  animation: mv-breathe 0.8s ease-in-out infinite;
+  box-shadow:
+    0 14px 30px rgba(0, 60, 30, 0.55),
+    0 0 65px 15px rgba(50, 230, 120, 0.65),
+    inset -12px -16px 30px rgba(0, 40, 20, 0.6),
+    inset 8px 10px 20px rgba(255, 255, 255, 0.4);
+}
+.mv-orb.thinking {
+  animation: mv-breathe 1.5s ease-in-out infinite;
+  box-shadow:
+    0 14px 30px rgba(40, 0, 60, 0.55),
+    0 0 60px 12px rgba(180, 70, 255, 0.6),
+    inset -12px -16px 30px rgba(30, 0, 50, 0.6),
+    inset 8px 10px 20px rgba(255, 255, 255, 0.3);
+}
 /* 異常推播：警報 active 時球變紅色呼吸，提醒先看警報再說話。 */
 .mv-orb.alarm {
   animation: mv-breathe 1.2s ease-in-out infinite;
