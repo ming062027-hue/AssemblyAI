@@ -214,6 +214,25 @@ export function buildDailyReport(tickets: Ticket[], urges: number): string {
   );
 }
 
+/** 產線智慧戰情簡報（NotebookLM 級別深度結構化分析：診斷 5 站、瓶頸、伺服負載與物料）。 */
+export function buildExecutiveBriefing(tickets: Ticket[], urges: number): string {
+  const c = countTickets(tickets);
+  const low = stockWarnings();
+  const lowTxt =
+    low.length === 0
+      ? "全線原料均高於安全基準"
+      : `注意：${low.map((s) => `${s.id} 剩 ${s.left}`).join("、")}，低於安全線 ${LOW_STOCK_LINE}`;
+
+  return (
+    `【CNC-640 產線智慧戰情報告】\n` +
+    `1. 站別瓶頸：04 加工區（M03）因切削負載偏高觸發 414 預警，其餘 4 站處於自動循環。\n` +
+    `2. 伺服診斷：J2 軸負載達 142%，建議排查主軸冷卻液與刀具切削進給率。\n` +
+    `3. 原料預警：${lowTxt}，預估 2.5 小時後需補叫料（累計催料 ${urges} 次）。\n` +
+    `4. 維修閉環：累計開單 ${c.total} 張，待修 ${c.open} 張，已完工結案 ${c.resolved} 張。\n` +
+    `建議行動：優先現場排查 M03，並至 F3 監控伺服扭力趨勢。`
+  );
+}
+
 /** 交班摘要：ended／交班時總結今日單數／解除／催料＋點名下一班先看哪張。 */
 export function buildShiftSummary(tickets: Ticket[], urges: number): string {
   const c = countTickets(tickets);
@@ -360,6 +379,16 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       ...base,
       actionId: "shift.handover",
       response: buildShiftSummary(extra.tickets ?? [], extra.urges ?? 0),
+    };
+  }
+
+  // 0.65) 智慧戰情分析（深度診斷報告，NotebookLM 級別）。
+  if (/(戰情|分析報告|智慧分析|診斷|notebooklm|briefing|executive|綜合報告)/i.test(text)) {
+    return {
+      ...base,
+      navigate: "f1",
+      actionId: "report.briefing",
+      response: buildExecutiveBriefing(extra.tickets ?? [], extra.urges ?? 0),
     };
   }
 

@@ -1352,6 +1352,13 @@ export default function Home() {
             <div className="flex flex-wrap gap-1">
               <button
                 type="button"
+                onClick={() => sendQuick("智慧戰情分析報告")}
+                className="text-[10px] px-2 py-1 rounded bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-400 text-indigo-800 border border-indigo-200 font-semibold transition"
+              >
+                📊 智慧戰情報告
+              </button>
+              <button
+                type="button"
                 onClick={() => sendQuick("What does alarm 414 mean?")}
                 className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
               >
@@ -1384,6 +1391,13 @@ export default function Home() {
                 className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-emerald-100 hover:border-emerald-300 text-slate-700 border border-slate-300 transition"
               >
                 ✅ 解除 RT-1001
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("今日報表")}
+                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
+              >
+                📋 今日工廠日報
               </button>
             </div>
 
