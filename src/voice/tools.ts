@@ -77,6 +77,43 @@ export const TOOLS_S0 = [
     },
     execution_mode: "interactive",
     timeout_seconds: 10
+  },
+  {
+    type: "function",
+    name: "switch_console_view",
+    description: "Switch the CNC-640 console display view. f1 for process overview, f2 for AGV fleet, f3 for robotic arm torque, f4 for coolant & materials, f5 for repair tickets.",
+    parameters: {
+      type: "object",
+      properties: {
+        view: {
+          type: "string",
+          description: "Target view identifier.",
+          enum: ["f1", "f2", "f3", "f4", "f5"],
+          examples: ["f1", "f3"]
+        }
+      },
+      required: ["view"]
+    },
+    execution_mode: "interactive",
+    timeout_seconds: 15
+  },
+  {
+    type: "function",
+    name: "clear_machine_alarm",
+    description: "Clear or reset the active machine alarm on the CNC console, restoring normal status.",
+    parameters: {
+      type: "object",
+      properties: {
+        machine_id: {
+          type: "string",
+          description: "Optional machine ID to clear alarm for.",
+          enum: ["M01", "M02", "M03", "M04", "M05"],
+          examples: ["M03"]
+        }
+      }
+    },
+    execution_mode: "interactive",
+    timeout_seconds: 15
   }
 ];
 
