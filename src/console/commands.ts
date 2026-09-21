@@ -174,29 +174,32 @@ export function buildStartupReport(openTickets: number): StartupReport {
 }
 
 /** 異常推播內文：分級＋建議處置＋問要不要切畫面。 */
-export function buildAlarmPush(a: Alarm): { text: string; view: ScreenKey } {
+export function buildAlarmPush(a: Alarm, en = false): { text: string; view: ScreenKey } {
   const level = triageAlarm(a);
   if (level === "P0") {
     return {
       view: "f3",
-      text:
-        `【P0 緊急停機】這張要立刻處理：先停機、叫技師到場，不要再開車。` +
-        `要不要切到 F3 看軸向數據？`,
+      text: en
+        ? `[P0 Emergency Stop] Immediate action required: stop machine and call technician on site. Switch to F3 to view axis telemetry?`
+        : `【P0 緊急停機】這張要立刻處理：先停機、叫技師到場，不要再開車。` +
+          `要不要切到 F3 看軸向數據？`,
     };
   }
   if (level === "P1") {
     return {
       view: "f3",
-      text:
-        `【P1 預警】還能撐一下，但別拖：上面三步先做，要不要我開維修單或幫你催料？` +
-        `要不要切到 F3 看即時數據？`,
+      text: en
+        ? `[P1 Warning] Running with caution: perform the 3 checks above. Should I open a repair ticket? Switch to F3 for live data?`
+        : `【P1 預警】還能撐一下，但別拖：上面三步先做，要不要我開維修單或幫你催料？` +
+          `要不要切到 F3 看即時數據？`,
     };
   }
   return {
     view: "f5",
-    text:
-      `【P2 保養提醒】不急，排進下次保養就行。` +
-      `要不要查這台的保養紀錄？我切 F5 給你看也行。`,
+    text: en
+      ? `[P2 Maintenance Notice] Low urgency: schedule for next maintenance cycle. Check M03 history or switch to F5?`
+      : `【P2 保養提醒】不急，排進下次保養就行。` +
+        `要不要查這台的保養紀錄？我切 F5 給你看也行。`,
   };
 }
 
@@ -208,9 +211,16 @@ function countTickets(tickets: Ticket[]): { total: number; open: number; resolve
 }
 
 /** 今日報表：今日單數／解除／待修／催料＋低庫存提醒。 */
-export function buildDailyReport(tickets: Ticket[], urges: number): string {
+export function buildDailyReport(tickets: Ticket[], urges: number, en = false): string {
   const c = countTickets(tickets);
   const low = stockWarnings();
+  if (en) {
+    const lowTxt =
+      low.length === 0
+        ? "Raw materials well above safety threshold."
+        : `Low stock warning: ${low.map((s) => `${s.id} (${s.left} left)`).join(", ")}.`;
+    return `Daily Factory Report: ${c.total} tickets total, ${c.resolved} resolved, ${c.open} open. Supplier calls: ${urges}. ${lowTxt}`;
+  }
   const lowTxt =
     low.length === 0
       ? ""
@@ -222,9 +232,23 @@ export function buildDailyReport(tickets: Ticket[], urges: number): string {
 }
 
 /** 產線智慧戰情簡報（NotebookLM 級別深度結構化分析：診斷 5 站、瓶頸、伺服負載與物料）。 */
-export function buildExecutiveBriefing(tickets: Ticket[], urges: number): string {
+export function buildExecutiveBriefing(tickets: Ticket[], urges: number, en = false): string {
   const c = countTickets(tickets);
   const low = stockWarnings();
+  if (en) {
+    const lowTxt =
+      low.length === 0
+        ? "All raw materials above safety baseline."
+        : `Notice: ${low.map((s) => `${s.id} (${s.left} left)`).join(", ")}.`;
+    return (
+      `[CNC-640 Plant Executive Briefing]\n` +
+      `1. Bottleneck: St 04 (M03) under 414 alarm due to cutting load; other 4 stations cycling.\n` +
+      `2. Servo Diagnostics: J2 axis load at 142%; inspect spindle coolant & feed rate.\n` +
+      `3. Material Alert: ${lowTxt}, estimated refill in 2.5h (called supplier ${urges} times).\n` +
+      `4. Maintenance Loop: ${c.total} tickets total, ${c.open} open, ${c.resolved} resolved.\n` +
+      `Recommended Action: Prioritize inspection on M03, check torque trends in F3.`
+    );
+  }
   const lowTxt =
     low.length === 0
       ? "全線原料均高於安全基準"
@@ -254,7 +278,7 @@ export function buildShiftSummary(tickets: Ticket[], urges: number): string {
 }
 
 /** 現場任務指引：依即時警報、待修單、庫存與生產進度，告訴現場操作員「現在要做什麼事」。 */
-export function buildNextActionGuidance(extra: InterpretExtra = {}): { text: string; view: ScreenKey } {
+export function buildNextActionGuidance(extra: InterpretExtra = {}, en = false): { text: string; view: ScreenKey } {
   const tickets = extra.tickets ?? [];
   const openTickets = tickets.filter((t) => (t.status ?? "open") === "open");
   const low = stockWarnings();
@@ -271,7 +295,9 @@ export function buildNextActionGuidance(extra: InterpretExtra = {}): { text: str
   if (alarmCount > 0) {
     return {
       view: "f1",
-      text: "【當前第一優先任務】04 加工區（M03）處於 414 軸過載警報停機中！現在最重要的是排查主軸負載與刀具磨損，或對我說「開立維修單」通知保修技師到場處置。",
+      text: en
+        ? "[Priority Action] Station 04 (M03) is stopped under 414 axis overload alarm! Immediate check on spindle load and tool wear required, or say 'open a repair ticket' to dispatch a technician."
+        : "【當前第一優先任務】04 加工區（M03）處於 414 軸過載警報停機中！現在最重要的是排查主軸負載與刀具磨損，或對我說「開立維修單」通知保修技師到場處置。",
     };
   }
 
@@ -279,7 +305,9 @@ export function buildNextActionGuidance(extra: InterpretExtra = {}): { text: str
   if (openTickets.length > 0) {
     return {
       view: "f1",
-      text: `【待辦維修事項】目前有 ${openTickets.length} 張維修單（${openTickets.map((t) => t.ticket_id).join("、")}）待修中。若技師已檢修完畢，請對我說「${openTickets[0].ticket_id} 修好了」進行結案。`,
+      text: en
+        ? `[Pending Maintenance] There are ${openTickets.length} repair tickets (${openTickets.map((t) => t.ticket_id).join(", ")}) pending. Say 'resolve ticket RT-1001' when finished.`
+        : `【待辦維修事項】目前有 ${openTickets.length} 張維修單（${openTickets.map((t) => t.ticket_id).join("、")}）待修中。若技師已檢修完畢，請對我說「${openTickets[0].ticket_id} 修好了」進行結案。`,
     };
   }
 
@@ -287,14 +315,18 @@ export function buildNextActionGuidance(extra: InterpretExtra = {}): { text: str
   if (low.length > 0) {
     return {
       view: "f4",
-      text: `【物料補給任務】原料偏低：${low.map((s) => `${s.id} 剩餘 ${s.left}`).join("、")}，建議點擊 F4 叫料，或對我說「調度 AGV 補料」或「催料」。`,
+      text: en
+        ? `[Material Supply Task] Low raw materials: ${low.map((s) => `${s.id} (${s.left} left)`).join(", ")}. Press F4 to order, or say 'dispatch AGV' or 'call supplier'.`
+        : `【物料補給任務】原料偏低：${low.map((s) => `${s.id} 剩餘 ${s.left}`).join("、")}，建議點擊 F4 叫料，或對我說「調度 AGV 補料」或「催料」。`,
     };
   }
 
   // 4. 生產正常：推進生產與品檢
   return {
     view: "f1",
-    text: "【產線順暢推進】全線 5 站運轉正常無警報！目前工單 #WO-2026-A109 當班進度 348/500 件（69.6%），建議可點擊 F6 查看最新三次元品檢，或至 F7 檢查設備軸承健康度。",
+    text: en
+      ? "[Operations Smooth] All 5 stations cycling normally without alarms. Job #WO-2026-A109 shift progress 348/500 pcs (69.6%). Check F6 for CMM inspection or F7 for machine health."
+      : "【產線順暢推進】全線 5 站運轉正常無警報！目前工單 #WO-2026-A109 當班進度 348/500 件（69.6%），建議可點擊 F6 查看最新三次元品檢，或至 F7 檢查設備軸承健康度。",
   };
 }
 
@@ -304,7 +336,11 @@ const AGV_BATTERY = [
   { id: "AGV-02", level: 95, note: "待命中" },
 ];
 
-export function buildAgvBatteryReport(): string {
+export function buildAgvBatteryReport(en = false): string {
+  if (en) {
+    const parts = AGV_BATTERY.map((b) => `${b.id} ${b.level}%${b.id === "AGV-01" ? " (Low)" : ""}`);
+    return `AGV battery levels: ${parts.join(", ")}; AGV-03 and 04 are moving parts at QC line, battery normal. Say "dispatch AGV to charge" to recharge.`;
+  }
   const parts = AGV_BATTERY.map((b) => `${b.id} ${b.level}%${b.note}`);
   return `AGV 電量：${parts.join("、")}（示意值）；03、04 在品檢線搬運，電量正常。要回充就說「AGV 回充」。`;
 }
@@ -333,18 +369,24 @@ function findScreen(t: string): ScreenKey | null {
   return null;
 }
 
-export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtra = {}): CommandResult {
+export function interpret(
+  raw: string,
+  ctx: CommandContext,
+  extra: InterpretExtra = {},
+  isEn?: boolean,
+): CommandResult {
   const text = String(raw ?? "").trim();
+  const currentLang = isEn !== undefined ? (isEn ? "en" : "zh") : ctx.lang;
   // 每句回答完，未明確保留的 pendingView 一律清空（切畫面問題只等一句）。
   const base: CommandResult = {
     navigate: null,
     response: "",
-    context: { ...ctx, pendingView: null },
+    context: { ...ctx, lang: currentLang, pendingView: null },
     actionId: null,
   };
-  if (!text) return { ...base, response: "我在聽，請說指令。" };
+  if (!text) return { ...base, response: currentLang === "en" ? "I'm listening, please say a command." : "我在聽，請說指令。" };
   const t = text.toLowerCase();
-  const en = ctx.lang === "en";
+  const en = currentLang === "en";
 
   // F0) 短編號直跳：說 F1–F7 切對應畫面，F8＝警報靜音/解除。
   const fHit = t.match(/f\s?([1-8])\b/);
@@ -467,8 +509,9 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       ...base,
       navigate: "f3",
       actionId: "tool.status",
-      response:
-        "刀庫巡檢回報：T03 精銑球刀 R4 壽命僅剩 12%，已觸發磨耗預警，建議加工 2 件後更換備刀；其餘 T01、T02、T04~T06 壽命均大於 65% 正常。",
+      response: en
+        ? "Tool inspection report: T03 Ball Mill R4 wear at 12% critical threshold. Replacement recommended after 2 workpieces. Tools T01, T02, T04-T06 healthy (>65%)."
+        : "刀庫巡檢回報：T03 精銑球刀 R4 壽命僅剩 12%，已觸發磨耗預警，建議加工 2 件後更換備刀；其餘 T01、T02、T04~T06 壽命均大於 65% 正常。",
     };
   }
 
@@ -478,8 +521,9 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       ...base,
       navigate: "f1",
       actionId: "production.progress",
-      response:
-        "今日生產進度：當班目標 500 件，目前已完成 348 件，達成率 69.6%，工單 #WO-2026-A109 航太渦輪葉片現正切削中，預估 16:45 準時完工交付。",
+      response: en
+        ? "Today's production progress: shift target 500 pcs, 348 finished (69.6%), job #WO-2026-A109 aero turbine blade in progress, estimated completion at 16:45."
+        : "今日生產進度：當班目標 500 件，目前已完成 348 件，達成率 69.6%，工單 #WO-2026-A109 航太渦輪葉片現正切削中，預估 16:45 準時完工交付。",
     };
   }
 
@@ -489,8 +533,9 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       ...base,
       navigate: "f1",
       actionId: "cycle.remaining",
-      response:
-        "工件加工進度：目前執行單節 N0420 葉片型面精銑，本件剩餘約 1 分 15 秒，主軸轉速 8500 RPM，切削負載 74% 穩定。",
+      response: en
+        ? "Cycle remaining: executing block N0420 blade finishing, remaining cycle 1m 15s, spindle 8500 RPM, cutting load 74% stable."
+        : "工件加工進度：目前執行單節 N0420 葉片型面精銑，本件剩餘約 1 分 15 秒，主軸轉速 8500 RPM，切削負載 74% 穩定。",
     };
   }
 
@@ -500,8 +545,9 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       ...base,
       navigate: "f1",
       actionId: "oee.status",
-      response:
-        "工廠 OEE 總體效率：稼動率 92.4% × 效率 95.2% × 良率 99.4% = 總體 OEE 87.5%（優於產業標準 85%）。目前產線正常運轉無停機損失。",
+      response: en
+        ? "Plant OEE: 92.4% availability × 95.2% performance × 99.4% quality = overall OEE 87.5% (exceeds 85% industry benchmark). No downtime loss currently."
+        : "工廠 OEE 總體效率：稼動率 92.4% × 效率 95.2% × 良率 99.4% = 總體 OEE 87.5%（優於產業標準 85%）。目前產線正常運轉無停機損失。",
     };
   }
 
@@ -511,7 +557,7 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       ...base,
       navigate: "f1",
       actionId: "report.briefing",
-      response: buildExecutiveBriefing(extra.tickets ?? [], extra.urges ?? 0),
+      response: buildExecutiveBriefing(extra.tickets ?? [], extra.urges ?? 0, en),
     };
   }
 
@@ -521,8 +567,9 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       ...base,
       navigate: "f6",
       actionId: "qc.report",
-      response:
-        "報告主管，最新完工 Part #348 經三次元與 AI 視覺掃描：表面粗糙度 Ra 0.38µm（標準 <0.8µm），真圓度與輪廓公差 ±0.003mm 全數合格，0 毛刺 0 裂痕，當班良率 99.71%。",
+      response: en
+        ? "Quality Inspection: Part #348 verified by ZEISS CMM and AI vision. Ra 0.38µm, tolerance ±0.003mm within specs, zero defects, shift yield 99.71%."
+        : "報告主管，最新完工 Part #348 經三次元與 AI 視覺掃描：表面粗糙度 Ra 0.38µm（標準 <0.8µm），真圓度與輪廓公差 ±0.003mm 全數合格，0 毛刺 0 裂痕，當班良率 99.71%。",
     };
   }
 
@@ -532,8 +579,9 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       ...base,
       navigate: "f7",
       actionId: "energy.report",
-      response:
-        "目前全機運轉總功率 28.4 kW，今日累計耗電 184.6 度，依工業電價折算約 646.1 元（20.2 美元），ESG 碳排 91.3 kg CO2e，太陽能綠電自給率 36.8%。",
+      response: en
+        ? "Power telemetry: active load 28.4 kW, today's energy 184.6 kWh (~20.2 USD), carbon footprint 91.3 kg CO2e, rooftop solar share 36.8%."
+        : "目前全機運轉總功率 28.4 kW，今日累計耗電 184.6 度，依工業電價折算約 646.1 元（20.2 美元），ESG 碳排 91.3 kg CO2e，太陽能綠電自給率 36.8%。",
     };
   }
 
@@ -543,8 +591,9 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       ...base,
       navigate: "f7",
       actionId: "health.report",
-      response:
-        "設備預測健康度診斷：主軸軸承震動頻譜健康度 94.2%（ISO 10816: 0.82mm/s 運轉優良），滾珠螺桿潤滑油存量 68%（預估可用 48 小時），切削水濃度 8.5% 微偏低，空壓 0.65 MPa 正常。",
+      response: en
+        ? "Predictive Health: spindle bearing vibration 94.2% healthy (ISO 10816 0.82mm/s), ball screw lube level 68%, coolant Brix 8.5%, pneumatic 0.65 MPa normal."
+        : "設備預測健康度診斷：主軸軸承震動頻譜健康度 94.2%（ISO 10816: 0.82mm/s 運轉優良），滾珠螺桿潤滑油存量 68%（預估可用 48 小時），切削水濃度 8.5% 微偏低，空壓 0.65 MPa 正常。",
     };
   }
 
@@ -556,8 +605,9 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
         navigate: "f1",
         actionId: "workorder.switch",
         workOrder: "B202",
-        response:
-          "已切換至工單 #WO-2026-B202 航太高壓燃油閥體（AL7075-T6 航太鋁），載入加工檔 0202_VALVE.NC，主軸目標設定 12,000 RPM，主刀具 T02 粗銑刀，週期 3 分 15 秒。",
+        response: en
+          ? "Switched to Work Order #WO-2026-B202 High Pressure Fuel Valve (AL7075-T6), loaded 0202_VALVE.NC, target 12,000 RPM, tool T02, cycle 3m 15s."
+          : "已切換至工單 #WO-2026-B202 航太高壓燃油閥體（AL7075-T6 航太鋁），載入加工檔 0202_VALVE.NC，主軸目標設定 12,000 RPM，主刀具 T02 粗銑刀，週期 3 分 15 秒。",
       };
     }
     if (/(c303|人工關節|髖關節|醫療|不鏽鋼|316l)/i.test(text)) {
@@ -566,8 +616,9 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
         navigate: "f1",
         actionId: "workorder.switch",
         workOrder: "C303",
-        response:
-          "已切換至工單 #WO-2026-C303 醫療級人工髖關節球體（SUS316L 醫療不鏽鋼），載入加工檔 0303_HIP.NC，主軸目標設定 6,800 RPM，主刀具 T01 面銑刀，週期 5 分 40 秒。",
+        response: en
+          ? "Switched to Work Order #WO-2026-C303 Medical Hip Joint Sphere (SUS316L), loaded 0303_HIP.NC, target 6,800 RPM, tool T01, cycle 5m 40s."
+          : "已切換至工單 #WO-2026-C303 醫療級人工髖關節球體（SUS316L 醫療不鏽鋼），載入加工檔 0303_HIP.NC，主軸目標設定 6,800 RPM，主刀具 T01 面銑刀，週期 5 分 40 秒。",
       };
     }
     return {
@@ -575,8 +626,9 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       navigate: "f1",
       actionId: "workorder.switch",
       workOrder: "A109",
-      response:
-        "已切換至工單 #WO-2026-A109 航太發動機渦輪葉片（Ti-6Al-4V 鈦合金），載入加工檔 0415_BLADE.NC，主軸目標設定 8,500 RPM，主刀具 T03 精銑球刀，週期 4 分 30 秒。",
+      response: en
+        ? "Switched to Work Order #WO-2026-A109 Aero Turbine Blade (Ti-6Al-4V), loaded 0415_BLADE.NC, target 8,500 RPM, tool T03, cycle 4m 30s."
+        : "已切換至工單 #WO-2026-A109 航太發動機渦輪葉片（Ti-6Al-4V 鈦合金），載入加工檔 0415_BLADE.NC，主軸目標設定 8,500 RPM，主刀具 T03 精銑球刀，週期 4 分 30 秒。",
     };
   }
 
@@ -586,7 +638,7 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       ...base,
       navigate: "f1",
       actionId: "report.daily",
-      response: buildDailyReport(extra.tickets ?? [], extra.urges ?? 0),
+      response: buildDailyReport(extra.tickets ?? [], extra.urges ?? 0, en),
     };
   }
 
@@ -608,7 +660,9 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
           ...base,
           navigate: "f1",
           actionId: "ticket.status",
-          response: `找不到 ${want}。${openIds.length ? `目前待修：${openIds.join("、")}。` : "目前沒有維修單。"}`,
+          response: en
+            ? `Ticket ${want} not found. ${openIds.length ? `Active tickets: ${openIds.join(", ")}.` : "No active tickets right now."}`
+            : `找不到 ${want}。${openIds.length ? `目前待修：${openIds.join("、")}。` : "目前沒有維修單。"}`,
         };
       }
       const done = (found.status ?? "open") === "resolved";
@@ -617,8 +671,8 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
         navigate: "f1",
         actionId: "ticket.status",
         response: done
-          ? `${found.ticket_id} 已完成（維修解除），${found.machine_id}，${found.symptom}。`
-          : `${found.ticket_id} 待修中：${found.machine_id}，${found.symptom}，嚴重度 ${found.severity}。`,
+          ? (en ? `Ticket ${found.ticket_id} resolved for ${found.machine_id}: ${found.symptom}.` : `${found.ticket_id} 已完成（維修解除），${found.machine_id}，${found.symptom}。`)
+          : (en ? `Ticket ${found.ticket_id} pending on ${found.machine_id}: ${found.symptom}, severity ${found.severity}.` : `${found.ticket_id} 待修中：${found.machine_id}，${found.symptom}，嚴重度 ${found.severity}。`),
       };
     }
   }
@@ -649,7 +703,9 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       navigate: "f1",
       actionId: "ticket.create",
       ticketId: res.ticket_id,
-      response: `已為 ${machine} 開出高優先度維修單 ${res.ticket_id}（${symptom}），主管看板即時收到通知。`,
+      response: en
+        ? `Created high-priority ticket ${res.ticket_id} for ${machine} (${symptom}). Supervisor dashboard notified in real-time.`
+        : `已為 ${machine} 開出高優先度維修單 ${res.ticket_id}（${symptom}），主管看板即時收到通知。`,
     };
   }
 
@@ -661,13 +717,15 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
     if ("error" in a) return { ...base, navigate: "f3", actionId: "alarm.lookup", response: a.error };
     base.context.alarm = a.code;
     const checks = a.first_checks.map((c, i) => `${i + 1}. ${c}`).join("　");
-    const push = buildAlarmPush(a);
+    const push = buildAlarmPush(a, en);
     base.context.pendingView = push.view;
     return {
       ...base,
       actionId: "alarm.lookup",
       alarm: a,
-      response: `【異常推播】警報 ${a.code}：${a.title}。可能原因：${a.likely_causes}。前三步：${checks} ${push.text}`,
+      response: en
+        ? `[Alert Push] Alarm ${a.code}: ${a.title}. Root causes: ${a.likely_causes}. First 3 checks: ${checks}. ${push.text}`
+        : `【異常推播】警報 ${a.code}：${a.title}。可能原因：${a.likely_causes}。前三步：${checks} ${push.text}`,
     };
   }
 
@@ -680,15 +738,17 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
         ...base,
         navigate: "f2",
         actionId: "agv.battery",
-        agv: { id: agvId, task: "前往充電樁回充" },
-        response: `好，${agvId} 去充電樁回充，充飽自動歸隊。`,
+        agv: { id: agvId, task: en ? "Moving to charging station" : "前往充電樁回充" },
+        response: en
+          ? `Roger, sending ${agvId} to the charging dock. Will resume duty automatically once fully charged.`
+          : `好，${agvId} 去充電樁回充，充飽自動歸隊。`,
       };
     }
     return {
       ...base,
       navigate: "f2",
       actionId: "agv.battery",
-      response: buildAgvBatteryReport(),
+      response: buildAgvBatteryReport(en),
     };
   }
 
@@ -700,19 +760,24 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
         ...base,
         navigate: "f4",
         actionId: "material.forecast",
-        response: `耗材預測：5 站原料都在安全線 ${LOW_STOCK_LINE} 以上，目前不用催料。`,
+        response: en
+          ? `Material forecast: all 5 raw material stations above safety line (${LOW_STOCK_LINE}). No replenishment needed right now.`
+          : `耗材預測：5 站原料都在安全線 ${LOW_STOCK_LINE} 以上，目前不用催料。`,
       };
     }
     const parts = lows.map((s) =>
-      s.left === 0 ? `${s.id} 已用完` : `${s.id} 剩 ${s.left}`,
+      s.left === 0
+        ? (en ? `${s.id} depleted` : `${s.id} 已用完`)
+        : (en ? `${s.id} has ${s.left} left` : `${s.id} 剩 ${s.left}`),
     );
     return {
       ...base,
       navigate: "f4",
       actionId: "material.forecast",
-      response:
-        `耗材預測：${parts.join("、")}，低於安全線 ${LOW_STOCK_LINE}，建議今天催料。` +
-        `要我打給供應商嗎？`,
+      response: en
+        ? `Material forecast: ${parts.join(", ")}, below safety line (${LOW_STOCK_LINE}). Replenishment suggested today. Should I call the supplier?`
+        : `耗材預測：${parts.join("、")}，低於安全線 ${LOW_STOCK_LINE}，建議今天催料。` +
+          `要我打給供應商嗎？`,
     };
   }
 
@@ -721,13 +786,14 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
     const idHit = text.match(/agv[- ]?0?([1-4])/i) || text.match(/([1-4])\s*號/);
     const agvId = `AGV-0${idHit ? idHit[1] : "2"}`;
     const targetHit = text.match(/([12])\s*號手臂/);
-    const task = `送料至 ${targetHit ? targetHit[1] : "1"} 號手臂`;
+    const armNum = targetHit ? targetHit[1] : "1";
+    const task = en ? `Feed raw stock to Robot Arm #${armNum}` : `送料至 ${armNum} 號手臂`;
     return {
       ...base,
       navigate: "f2",
       actionId: "agv.dispatch",
       agv: { id: agvId, task },
-      response: `已調度 ${agvId}：${task}。`,
+      response: en ? `Dispatched ${agvId}: ${task}.` : `已調度 ${agvId}：${task}。`,
     };
   }
 
@@ -740,7 +806,9 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       navigate: "f4",
       actionId: "supplier.urge",
       supplier: { material },
-      response: `已致電供應商催促『${material}』，工單已建立。`,
+      response: en
+        ? `Called supplier to expedite delivery of ${material}. PO tracking ticket created.`
+        : `已致電供應商催促『${material}』，工單已建立。`,
     };
   }
 
@@ -750,12 +818,14 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
     const h = get_maintenance_history({ machine_id: machine, limit: 3 });
     if ("error" in h) return { ...base, navigate: "f5", actionId: "maint.lookup", response: h.error };
     base.context.machine = machine;
-    const recs = h.records.map((r) => `${r.date} ${r.item}`).join("；");
+    const recs = h.records.map((r) => `${r.date} ${r.item}`).join(en ? "; " : "；");
     return {
       ...base,
       navigate: "f5",
       actionId: "maint.lookup",
-      response: `${machine} 最近保養：${recs || "無紀錄"}。要我開維修單嗎？`,
+      response: en
+        ? `${machine} recent maintenance: ${recs || "No records"}. Would you like me to open a repair ticket?`
+        : `${machine} 最近保養：${recs || "無紀錄"}。要我開維修單嗎？`,
     };
   }
 
@@ -765,13 +835,17 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
     const m = get_machine_status({ machine_id: machine });
     if ("error" in m) return { ...base, navigate: "f1", actionId: "alarm.lookup", response: m.error };
     base.context.machine = m.id;
-    const alarmTxt = m.current_alarm ? `目前警報 ${m.current_alarm}` : "目前無警報";
+    const alarmTxt = m.current_alarm
+      ? (en ? `current alarm ${m.current_alarm}` : `目前警報 ${m.current_alarm}`)
+      : (en ? "no active alarm" : "目前無警報");
     return {
       ...base,
       navigate: "f1",
       actionId: "alarm.lookup",
       machine: m,
-      response: `${m.name}（${m.id}）狀態：${m.status}，${alarmTxt}。`,
+      response: en
+        ? `${m.name} (${m.id}) status: ${m.status}, ${alarmTxt}.`
+        : `${m.name}（${m.id}）狀態：${m.status}，${alarmTxt}。`,
     };
   }
 
@@ -779,7 +853,12 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
   const nav = findScreen(t);
   if (nav) {
     const s = SCREENS.find((x) => x.key === nav)!;
-    return { ...base, navigate: nav, actionId: "nav.view", response: `好的，切換到「${s.name}」。` };
+    return {
+      ...base,
+      navigate: nav,
+      actionId: "nav.view",
+      response: en ? `Roger, switching to screen ${s.key.toUpperCase()} - ${s.name}.` : `好的，切換到「${s.name}」。`,
+    };
   }
 
   // 5.5) 日常對話（讓宇宙像個管家；英文模式回英文）。

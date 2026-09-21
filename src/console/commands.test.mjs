@@ -120,4 +120,18 @@ describe("15 Universal Quick Actions for CNC-640 Console", () => {
     assert.equal(res.navigate, "f1");
     assert.match(res.response, /當前第一優先任務|待辦維修事項|產線順暢推進/);
   });
+
+  it("17. English Mode: executive briefing -> F1 in English", () => {
+    const res = interpret("executive briefing", ctx, {}, true);
+    assert.equal(res.actionId, "report.briefing");
+    assert.equal(res.navigate, "f1");
+    assert.match(res.response, /CNC-640 Plant Executive Briefing/);
+  });
+
+  it("18. English Mode: urge supplier -> F4 in English", () => {
+    const res = interpret("urge supplier S45C", ctx, {}, true);
+    assert.equal(res.actionId, "supplier.urge");
+    assert.equal(res.navigate, "f4");
+    assert.match(res.response, /Called supplier to expedite delivery of S45C/);
+  });
 });

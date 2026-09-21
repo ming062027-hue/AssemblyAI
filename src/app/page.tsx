@@ -48,6 +48,283 @@ const TAB_NAMES: Record<ViewKey, string> = {
   f7: "F7 綠色能源與設備健康",
 };
 
+const TAB_NAMES_EN: Record<ViewKey, string> = {
+  f1: "F1 Main Process Overview",
+  f2: "F2 AGV Fleet Manual Dispatch",
+  f3: "F3 Robot Arm & Axis Telemetry",
+  f4: "F4 Raw Material Inventory & Urge",
+  f5: "F5 AI Outbound Call & Tickets",
+  f6: "F6 AI Vision & CMM QC Inspection",
+  f7: "F7 ESG Energy & Machine Health",
+};
+
+interface SupplierCallRecord {
+  id: string;
+  target: string;
+  duration: string;
+  time: string;
+  aiSay: string;
+  respSay: string;
+  po: string;
+  type: "repair" | "material";
+}
+
+interface QuickActionItem {
+  id: string;
+  nameZh: string;
+  nameEn: string;
+  cmdZh: string;
+  cmdEn: string;
+  tag: string;
+  tagClass: string;
+  btnClass: string;
+  descZh: string;
+  descEn: string;
+}
+
+const QUICK_ACTIONS: QuickActionItem[] = [
+  {
+    id: "briefing",
+    nameZh: "📊 智慧戰情報告",
+    nameEn: "📊 Executive Briefing",
+    cmdZh: "智慧戰情報告",
+    cmdEn: "executive briefing",
+    tag: "F1",
+    tagClass: "text-indigo-500",
+    btnClass: "bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-200",
+    descZh: "智慧戰情報告（診斷 5 站、瓶頸、伺服負載與物料）",
+    descEn: "Executive briefing: 5-station telemetry, bottleneck, load & stock",
+  },
+  {
+    id: "qc",
+    nameZh: "🔬 最新品檢報告",
+    nameEn: "🔬 Quality Inspection",
+    cmdZh: "最新品檢報告",
+    cmdEn: "quality inspection report",
+    tag: "F6",
+    tagClass: "text-purple-500",
+    btnClass: "bg-purple-50 hover:bg-purple-100 text-purple-900 border-purple-200",
+    descZh: "最新品檢報告（CMM 三次元測量與 AI 瑕疵）",
+    descEn: "CMM 3D metrology, surface roughness Ra & AI defect analysis",
+  },
+  {
+    id: "energy",
+    nameZh: "⚡ 廠房即時能耗",
+    nameEn: "⚡ Real-time Energy",
+    cmdZh: "廠房即時能耗",
+    cmdEn: "factory energy consumption",
+    tag: "F7",
+    tagClass: "text-emerald-500",
+    btnClass: "bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-200",
+    descZh: "廠房即時能耗（功率、累計度數、電費、碳排）",
+    descEn: "Active load kW, power cost & ESG carbon footprint",
+  },
+  {
+    id: "health",
+    nameZh: "🛡️ 設備預測健康",
+    nameEn: "🛡️ Predictive Health",
+    cmdZh: "設備預測健康",
+    cmdEn: "machine health diagnostics",
+    tag: "F7",
+    tagClass: "text-cyan-500",
+    btnClass: "bg-cyan-50 hover:bg-cyan-100 text-cyan-900 border-cyan-200",
+    descZh: "設備預測健康（主軸軸承頻譜、潤滑油、切削水）",
+    descEn: "Spindle bearing vibration, lube oil & coolant concentration",
+  },
+  {
+    id: "workorder",
+    nameZh: "🔄 換切燃油閥體",
+    nameEn: "🔄 Switch Fuel Valve",
+    cmdZh: "換切燃油閥體",
+    cmdEn: "switch to work order B202 fuel valve",
+    tag: "MES",
+    tagClass: "text-blue-500",
+    btnClass: "bg-blue-50 hover:bg-blue-100 text-blue-900 border-blue-200",
+    descZh: "換切工單 B202 航太高壓燃油閥體",
+    descEn: "Switch to Work Order B202 Aero High-Pressure Fuel Valve",
+  },
+  {
+    id: "alarm",
+    nameZh: "🔍 查 414 警報",
+    nameEn: "🔍 Check Alarm 414",
+    cmdZh: "查 414 警報",
+    cmdEn: "check alarm 414",
+    tag: "ALARM",
+    tagClass: "text-rose-600",
+    btnClass: "bg-rose-50 hover:bg-rose-100 text-rose-900 border-rose-300",
+    descZh: "查詢 414 警報原因與排除步驟（啟動故障演練連鎖）",
+    descEn: "Lookup alarm 414 causes & 3-step troubleshooting sequence",
+  },
+  {
+    id: "nav_arm",
+    nameZh: "🦾 F3 手臂軸向",
+    nameEn: "🦾 F3 Robot Arm",
+    cmdZh: "F3 手臂軸向",
+    cmdEn: "switch to screen F3 robot arm",
+    tag: "F3",
+    tagClass: "text-slate-500",
+    btnClass: "bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-300",
+    descZh: "查看 F3 機械手臂 6 軸扭力與刀庫",
+    descEn: "View Robot Arm 6-axis torque telemetry & tool magazine",
+  },
+  {
+    id: "ticket_create",
+    nameZh: "📝 開立維修單",
+    nameEn: "📝 Open Ticket",
+    cmdZh: "開立維修單",
+    cmdEn: "open a repair ticket",
+    tag: "DISPATCH",
+    tagClass: "text-amber-600",
+    btnClass: "bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300",
+    descZh: "為 M03 開立高優先度維修單並同步主管看板",
+    descEn: "Dispatch high-priority repair ticket to supervisor dashboard",
+  },
+  {
+    id: "alarm_clear",
+    nameZh: "🔕 解除警報",
+    nameEn: "🔕 Clear Alarm",
+    cmdZh: "解除警報",
+    cmdEn: "clear alarm reset",
+    tag: "RESET",
+    tagClass: "text-rose-700",
+    btnClass: "bg-rose-100 hover:bg-rose-200 text-rose-950 border-rose-400",
+    descZh: "解除警報（04 加工區恢復運作、警報面板收回）",
+    descEn: "Reset alarm, restore machining zone 04 & clear alert panel",
+  },
+  {
+    id: "ticket_resolve",
+    nameZh: "✅ 解除 RT-1001",
+    nameEn: "✅ Resolve RT-1001",
+    cmdZh: "解除 RT-1001",
+    cmdEn: "resolve ticket RT-1001",
+    tag: "RESOLVE",
+    tagClass: "text-emerald-600",
+    btnClass: "bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300",
+    descZh: "維修完工解除 RT-1001 並結案",
+    descEn: "Mark maintenance complete for ticket RT-1001 and close loop",
+  },
+  {
+    id: "daily_report",
+    nameZh: "📋 今日工廠日報",
+    nameEn: "📋 Daily Report",
+    cmdZh: "今日工廠日報",
+    cmdEn: "today factory daily report",
+    tag: "REPORT",
+    tagClass: "text-slate-500",
+    btnClass: "bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-300",
+    descZh: "今日工廠日報（開單、結案、催料、低庫存提醒）",
+    descEn: "Daily factory summary: tickets, urges, and inventory warnings",
+  },
+  {
+    id: "tool_wear",
+    nameZh: "🗡️ 刀具磨損預警",
+    nameEn: "🗡️ Tool Wear",
+    cmdZh: "刀具磨損預警",
+    cmdEn: "tool wear status alert",
+    tag: "TOOL",
+    tagClass: "text-amber-600",
+    btnClass: "bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300",
+    descZh: "刀具磨損狀態與更換備刀預警",
+    descEn: "Spindle tool wear telemetry & standby tool replacement warning",
+  },
+  {
+    id: "production",
+    nameZh: "🎯 今日產量進度",
+    nameEn: "🎯 Production Target",
+    cmdZh: "今日產量進度",
+    cmdEn: "today production progress",
+    tag: "PROD",
+    tagClass: "text-slate-500",
+    btnClass: "bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-300",
+    descZh: "今日生產進度與當班達成率",
+    descEn: "Shift production count and completion rate vs target 500 pcs",
+  },
+  {
+    id: "cycle",
+    nameZh: "⏱️ 切削倒數時間",
+    nameEn: "⏱️ Cycle Time",
+    cmdZh: "切削倒數時間",
+    cmdEn: "cycle remaining time",
+    tag: "CYCLE",
+    tagClass: "text-slate-500",
+    btnClass: "bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-300",
+    descZh: "當前工件切削剩餘倒數時間",
+    descEn: "Remaining machining cycle time for active NC block",
+  },
+  {
+    id: "oee",
+    nameZh: "📈 OEE與停機損失",
+    nameEn: "📈 OEE & Downtime",
+    cmdZh: "OEE與停機損失",
+    cmdEn: "oee status and downtime loss",
+    tag: "OEE",
+    tagClass: "text-slate-500",
+    btnClass: "bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-300",
+    descZh: "查詢工廠 OEE 總體設備效率",
+    descEn: "Overall Equipment Effectiveness & real-time downtime cost rate",
+  },
+];
+
+/** 🔊 Web Audio API 合成真實電話撥號 (DTMF) ＋ 振鈴 (Ringback Tone) 音效 */
+function playPhoneCallAudio() {
+  if (typeof window === "undefined") return;
+  try {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+
+    // 1. DTMF 觸控撥號雙音頻 (3 個電話號碼按鍵聲)
+    const dtmfPairs = [
+      [770, 1336], // 按鍵 5
+      [852, 1209], // 按鍵 7
+      [941, 1477], // 按鍵 #
+    ];
+    dtmfPairs.forEach(([f1, f2], idx) => {
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc1.frequency.value = f1;
+      osc2.frequency.value = f2;
+      const startT = now + idx * 0.14;
+      gain.gain.setValueAtTime(0, startT);
+      gain.gain.linearRampToValueAtTime(0.12, startT + 0.02);
+      gain.gain.setValueAtTime(0.12, startT + 0.08);
+      gain.gain.linearRampToValueAtTime(0, startT + 0.1);
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+      osc1.start(startT);
+      osc2.start(startT);
+      osc1.stop(startT + 0.11);
+      osc2.stop(startT + 0.11);
+    });
+
+    // 2. 電信標準回鈴音 (440Hz + 480Hz 雙音頻電話接通嘟聲)
+    const ringT = now + 0.48;
+    const oscA = ctx.createOscillator();
+    const oscB = ctx.createOscillator();
+    const ringGain = ctx.createGain();
+    oscA.frequency.value = 440;
+    oscB.frequency.value = 480;
+    ringGain.gain.setValueAtTime(0, ringT);
+    ringGain.gain.linearRampToValueAtTime(0.15, ringT + 0.04);
+    ringGain.gain.setValueAtTime(0.15, ringT + 0.75);
+    ringGain.gain.linearRampToValueAtTime(0, ringT + 0.85);
+    oscA.connect(ringGain);
+    oscB.connect(ringGain);
+    ringGain.connect(ctx.destination);
+    oscA.start(ringT);
+    oscB.start(ringT);
+    oscA.stop(ringT + 0.9);
+    oscB.stop(ringT + 0.9);
+  } catch (err) {
+    console.warn("Web Audio telephone effect failed:", err);
+  }
+}
+
 // 派工包 v2 §2.1 中央狀態：五站子項各自燈號（§3 表）。
 // green 正常 / blue 搬運中（補料中＝藍）/ amber 待命 / red 警報
 type Light = "green" | "blue" | "amber" | "red";
@@ -103,6 +380,34 @@ export default function Home() {
   // 🏭 工廠真實心跳動態引擎（G-code 滾動、週期倒數、OEE、停機損失計價、刀具磨損、三大工單、故障演練、品檢、綠能）
   const heartbeat = useFactoryHeartbeat(isAlarm, (alarm) => setIsAlarm(alarm));
   const [wakeEnabled, setWakeEnabled] = useState(true);
+
+  // 🌐 國際競賽雙語切換 (zh: 繁體中文現場 / en: International Competition English)
+  const [langMode, setLangMode] = useState<"zh" | "en">("zh");
+
+  // 📞 外部 AI 催料通話狀態 (idle | calling | done)
+  const [supplierCallStatus, setSupplierCallStatus] = useState<"idle" | "calling" | "done">("idle");
+  const [supplierCalls, setSupplierCalls] = useState<SupplierCallRecord[]>([
+    {
+      id: "TICKET-8902",
+      target: "機械手臂原廠緊急維修窗口",
+      duration: "通話 52 秒",
+      time: "2026-09-19 13:10:15",
+      aiSay: "2號手臂發生 E-402 伺服負載 142% 警報，現場無障礙物，判定內部卡料需工程師到廠。",
+      respSay: "工單已成立，已指派工程師攜帶備品，預計 15:00 前抵達。",
+      po: "工單編號：#TICKET-8902 (預約確認)",
+      type: "repair",
+    },
+    {
+      id: "PO-20260919-01",
+      target: "晉茂鋼鐵業務窗口",
+      duration: "通話 38 秒",
+      time: "2026-09-19 12:45:00",
+      aiSay: "李經理，S45C Ø50 圓棒庫存已跌破安全線，請依協議緊急配送 200 支。",
+      respSay: "有現貨，已排明日第一班車送達。",
+      po: "EDI 採購單：#PO-20260919-01 (已出單)",
+      type: "material",
+    },
+  ]);
 
   // Model宇宙 語音管家
   const [mvListening, setMvListening] = useState(false);
@@ -298,12 +603,51 @@ export default function Home() {
     msgTimer.current = setTimeout(() => setAgvMsg(null), 3500);
   }, []);
 
-  const callSupplierManual = useCallback((mat: string) => {
-    setUrgeCount((n) => n + 1);
-    setSupplierMsg(`[AI通話完成] 已致電供應商催促『${mat}』，工單已建立。`);
-    if (msgTimer.current) clearTimeout(msgTimer.current);
-    msgTimer.current = setTimeout(() => setSupplierMsg(null), 4000);
-  }, []);
+  const callSupplierManual = useCallback(
+    (mat: string) => {
+      // 1. 播放真實電話撥號 (DTMF) ＋ 雙音頻振鈴音效 (Web Audio API)
+      playPhoneCallAudio();
+      setSupplierCallStatus("calling");
+      setUrgeCount((n) => n + 1);
+
+      const isEn = langMode === "en";
+      const msg = isEn
+        ? `Outbound call to Jinmao Steel for '${mat}' connected. Supplier confirmed 20 pcs dispatched, ETA 14:30. Expedited PO created.`
+        : `正在致電晉茂鋼鐵業務窗口催促『${mat}』... 供應商確認現貨 20 支裝車出發，預計今日 14:30 前送達，已成立急件採購工單！`;
+
+      setSupplierMsg(msg);
+      setMvReply(msg);
+      speak(msg, langMode);
+      openDialog();
+
+      // 2. 接通交談完成，切換狀態並寫入 F5 通話日誌
+      window.setTimeout(() => {
+        setSupplierCallStatus("done");
+        const poNum = `#PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-0${urgeCount + 1}`;
+        setSupplierCalls((prev) => [
+          {
+            id: poNum,
+            target: isEn ? "Jinmao Steel Outbound Supply" : "晉茂鋼鐵業務窗口 (AI自動催料)",
+            duration: isEn ? "Call 32s" : "通話 32 秒",
+            time: new Date().toLocaleTimeString(),
+            aiSay: isEn
+              ? `AI: "Emergency stock replenishment: CNC-640 S45C bar inventory critical at 35 pcs. Need expedited delivery."`
+              : `AI:「晉茂鋼鐵您好，CNC-640 目前 S45C Ø50 圓棒庫存僅剩 35 支，請依協議急件配送 20 支。」`,
+            respSay: isEn
+              ? `Supplier: "Received! 20 pcs loaded on priority truck, ETA 14:30 at factory dock."`
+              : `供應商:「收到！倉庫現貨已有 20 支裝車，預計下午 14:30 前專車直達工廠碼頭。」`,
+            po: `${isEn ? "Expedited PO: " : "EDI 採購單："}${poNum} (${isEn ? "Dispatched" : "已出單配送"})`,
+            type: "material",
+          },
+          ...prev,
+        ]);
+      }, 1200);
+
+      if (msgTimer.current) clearTimeout(msgTimer.current);
+      msgTimer.current = setTimeout(() => setSupplierMsg(null), 6000);
+    },
+    [langMode, urgeCount, speak, openDialog],
+  );
 
   // 派工包 v2 §4：解除警報只有這一個函式。
   // 語音「解除警報」＋警報面板按鈕＋F6 都接它：面板收回、04 轉正常、F3 的 J2 142% 一起清除。
@@ -312,24 +656,28 @@ export default function Home() {
     setIsAlarm(false);
     heartbeat.injectFault("none");
     setMvCtx(emptyContext());
-    const msg = "警報已解除，04 加工區恢復正常，警報面板已收回。";
+    const isEn = langMode === "en";
+    const msg = isEn
+      ? "Alarm cleared. Machining Station 04 returned to normal, alert panel closed."
+      : "警報已解除，04 加工區恢復正常，警報面板已收回。";
     setMvReply(msg);
-    speak(msg);
+    speak(msg, langMode);
     openDialog();
     if (bridge.status === "listening" || bridge.status === "speaking" || bridge.status === "thinking") {
       bridge.sendSay("clear machine alarm");
     }
-  }, [speak, openDialog, bridge, heartbeat]);
+  }, [langMode, speak, openDialog, bridge, heartbeat]);
 
   const runModelCommand = useCallback(
     (text: string) => {
       const t = text.trim();
       if (!t) return;
-      // 看板即時狀態傳進 interpret：交班摘要／今日報表／單號進度用，不讀別人的檔。
-      const res = interpret(t, mvCtx, { tickets: list(), urges: urgeCount });
+      // 看板即時狀態傳進 interpret：支援中英雙語
+      const isEn = langMode === "en";
+      const res = interpret(t, mvCtx, { tickets: list(), urges: urgeCount }, isEn);
       setMvCtx(res.context);
       setMvReply(res.response);
-      speak(res.response, res.context.lang);
+      speak(res.response, langMode);
       if (res.clearAlarm) {
         setIsAlarm(false); // 跟按鈕/F8 同一個效果
         heartbeat.injectFault("none");
@@ -348,9 +696,9 @@ export default function Home() {
       if (res.ticketId || res.ticketResolveId) setTickets(list()); // 同分頁強制刷新看板
       setMvDraft("");
       setMvListening(false);
-      openDialog(); // 講完彈出對話框，6 秒後自動收回
+      openDialog(); // 講完彈出對話框，10 秒後自動收回
     },
-    [mvCtx, urgeCount, speak, openDialog, dispatchAgv, callSupplierManual, heartbeat],
+    [langMode, mvCtx, urgeCount, speak, openDialog, dispatchAgv, callSupplierManual, heartbeat],
   );
 
   const toggleVoiceSession = useCallback(async () => {
@@ -443,13 +791,13 @@ export default function Home() {
       return;
     }
     const rec = new Ctor();
-    rec.lang = "zh-TW";
+    rec.lang = langMode === "en" ? "en-US" : "zh-TW";
     rec.continuous = false;
     rec.interimResults = false;
     rec.onresult = (e) => {
       const transcript = e.results[0][0].transcript;
       setMvDraft(transcript);
-      // 1. 本地 CNC-640 控制台一律立即執行指令，確保畫面因應與中文語音 100% 響應！
+      // 1. 本地 CNC-640 控制台一律立即執行指令，確保畫面因應與語音 100% 響應！
       runModelCommand(transcript);
       // 2. 若 Bridge 在線，同步送出文字給後端代理
       if (bridge.status === "listening" || bridge.status === "speaking" || bridge.status === "thinking") {
@@ -466,7 +814,7 @@ export default function Home() {
     } catch {
       setMvListening(false);
     }
-  }, [liveModeWanted, bridge, passcode, mvListening, toggleVoiceSession, openDialog, runModelCommand]);
+  }, [langMode, liveModeWanted, bridge, passcode, mvListening, toggleVoiceSession, openDialog, runModelCommand]);
 
   // 浮層夾取：對話框＋球是同一個 fixed 容器，夾的是整個浮層（球在框下方，
   // 只夾容器左上角會讓球掉出螢幕下緣 → 用容器實際寬高反推）。
@@ -581,7 +929,9 @@ export default function Home() {
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-base tracking-wide">SMART FACTORY SYSTEM · 智慧工廠總控系統</span>
+              <span className="font-bold text-base tracking-wide">
+                {langMode === "en" ? "SMART FACTORY SYSTEM · Autonomous Operations Hub" : "SMART FACTORY SYSTEM · 智慧工廠總控系統"}
+              </span>
               <span className="text-xs px-2 py-0.5 rounded bg-emerald-900/80 text-emerald-300 font-mono font-semibold border border-emerald-600">
                 AUTO RUN
               </span>
@@ -589,20 +939,42 @@ export default function Home() {
                 OEE {heartbeat.oeeTotal}%
               </span>
               <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-amber-300 font-mono font-semibold border border-slate-600">
-                🎯 今日產量: {heartbeat.partsToday}/{heartbeat.partsTarget} PCS ({heartbeat.completionRate}%)
+                {langMode === "en" ? "🎯 Today's Output: " : "🎯 今日產量: "}{heartbeat.partsToday}/{heartbeat.partsTarget} PCS ({heartbeat.completionRate}%)
               </span>
             </div>
             <div className="text-[11px] text-slate-400 font-mono flex items-center gap-3 mt-0.5">
               <span>MODE: FULL AUTONOMOUS</span>
               <span>•</span>
-              <span>VIEW: {TAB_NAMES[view]}</span>
+              <span>VIEW: {langMode === "en" ? TAB_NAMES_EN[view] : TAB_NAMES[view]}</span>
               <span>•</span>
-              <span className="text-slate-300">工單: {heartbeat.workOrder} ({heartbeat.partName})</span>
+              <span className="text-slate-300">{langMode === "en" ? "WO: " : "工單: "}{heartbeat.workOrder} ({heartbeat.partName})</span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2.5 font-mono text-xs flex-wrap">
+          {/* 🌐 國際比賽雙語切換按鈕 / Bilingual Hackathon Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              const next = langMode === "zh" ? "en" : "zh";
+              setLangMode(next);
+              const switchMsg = next === "en" ? "Switched to English voice & console mode." : "已切換至繁體中文語音與控制台模式。";
+              setMvReply(switchMsg);
+              speak(switchMsg, next);
+              openDialog();
+            }}
+            title="點擊切換 國際競賽英文模式 / 繁體中文現場模式 (Bilingual Toggle for Hackathon Judges)"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-mono font-bold transition shadow-sm ${
+              langMode === "en"
+                ? "bg-blue-600 border-blue-400 text-white hover:bg-blue-500 ring-2 ring-blue-300/40"
+                : "bg-slate-800 border-slate-600 text-slate-200 hover:bg-slate-700"
+            }`}
+          >
+            <span>🌐</span>
+            <span>{langMode === "en" ? "EN (English)" : "中文 (繁體)"}</span>
+          </button>
+
           {/* 免接觸「宇宙」語音喚醒開關（直接喊「宇宙」） */}
           <button
             type="button"
@@ -615,14 +987,20 @@ export default function Home() {
             }`}
           >
             <span className={`w-2 h-2 rounded-full ${wakeEnabled ? "bg-purple-400 animate-pulse" : "bg-slate-500"}`} />
-            <span>🎙️ 語音喚醒: {wakeEnabled ? "ON (喊「宇宙」)" : "OFF"}</span>
+            <span>
+              {langMode === "en"
+                ? `🎙️ Wake Word: ${wakeEnabled ? "ON ('Universe')" : "OFF"}`
+                : `🎙️ 語音喚醒: ${wakeEnabled ? "ON (喊「宇宙」)" : "OFF"}`}
+            </span>
           </button>
 
           {/* 停機損失即時跳表（老闆視角：每秒都在算錢） */}
           {isAlarm && (
             <div className="flex items-center gap-1.5 bg-rose-950/90 px-3 py-1.5 rounded border border-rose-500 text-rose-300 font-mono font-bold animate-pulse shadow-sm">
               <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-              <span>⏱ 停機損失: ${heartbeat.downtimeCostUSD} USD ({heartbeat.downtimeSec}s)</span>
+              <span>
+                {langMode === "en" ? "⏱ Downtime Loss: " : "⏱ 停機損失: "}${heartbeat.downtimeCostUSD} USD ({heartbeat.downtimeSec}s)
+              </span>
             </div>
           )}
 
@@ -1707,67 +2085,98 @@ export default function Home() {
                   <tbody className="divide-y text-slate-700">
                     <tr className="bg-amber-50">
                       <td className="p-2 font-bold font-mono">S45C 圓棒材 Ø50</td>
-                      <td className="p-2 font-bold text-rose-700">35 支</td>
-                      <td className="p-2 font-mono">50 支</td>
+                      <td className="p-2 font-bold text-rose-700">
+                        {langMode === "en" ? "35 pcs" : "35 支"}
+                        {supplierCallStatus === "done" && (
+                          <span className="ml-1 text-xs text-emerald-700 font-bold">
+                            {langMode === "en" ? "(+20 in transit)" : "(+20 支在途)"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-2 font-mono">{langMode === "en" ? "50 pcs" : "50 支"}</td>
                       <td className="p-2 text-right">
-                        <button type="button" onClick={() => callSupplierManual("S45C 圓棒材")} className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[10px] font-bold">催料通話</button>
+                        <button
+                          type="button"
+                          onClick={() => callSupplierManual("S45C 圓棒材")}
+                          disabled={supplierCallStatus === "calling"}
+                          className={`px-2.5 py-1 rounded text-[11px] font-bold shadow-sm transition flex items-center gap-1.5 ml-auto ${
+                            supplierCallStatus === "calling"
+                              ? "bg-amber-500 text-white animate-pulse"
+                              : supplierCallStatus === "done"
+                              ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                              : "bg-amber-600 hover:bg-amber-700 text-white"
+                          }`}
+                        >
+                          {supplierCallStatus === "calling" ? (
+                            <>
+                              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                              <span>{langMode === "en" ? "Calling Supplier..." : "撥號通話中..."}</span>
+                            </>
+                          ) : supplierCallStatus === "done" ? (
+                            <>
+                              <span>✅</span>
+                              <span>{langMode === "en" ? "Urged (ETA 14:30)" : "已催料 (14:30到)"}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>📞</span>
+                              <span>{langMode === "en" ? "Urge Call" : "催料通話"}</span>
+                            </>
+                          )}
+                        </button>
                       </td>
                     </tr>
                     <tr>
                       <td className="p-2 font-mono">AL6061 方棒 30x30</td>
-                      <td className="p-2 font-bold text-emerald-700">180 支</td>
-                      <td className="p-2 font-mono">60 支</td>
+                      <td className="p-2 font-bold text-emerald-700">{langMode === "en" ? "180 pcs" : "180 支"}</td>
+                      <td className="p-2 font-mono">{langMode === "en" ? "60 pcs" : "60 支"}</td>
                       <td className="p-2 text-right text-slate-400">-</td>
                     </tr>
                     <tr>
                       <td className="p-2 font-mono">SUS304 棒材 Ø20</td>
-                      <td className="p-2 font-bold text-emerald-700">92 支</td>
-                      <td className="p-2 font-mono">40 支</td>
+                      <td className="p-2 font-bold text-emerald-700">{langMode === "en" ? "92 pcs" : "92 支"}</td>
+                      <td className="p-2 font-mono">{langMode === "en" ? "40 pcs" : "40 支"}</td>
                       <td className="p-2 text-right text-slate-400">-</td>
                     </tr>
                   </tbody>
                 </table>
                 {supplierMsg && (
-                  <div className="p-2 bg-blue-50 border border-blue-300 rounded text-xs font-mono text-blue-800">
-                    {supplierMsg}
+                  <div className="p-2.5 bg-blue-50 border border-blue-300 rounded text-xs font-mono text-blue-900 shadow-sm animate-fade-in flex items-center gap-2">
+                    <span className="text-base">📞</span>
+                    <span>{supplierMsg}</span>
                   </div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* ============ F5 AI 通話紀錄（原樣） ============ */}
+          {/* ============ F5 AI 通話紀錄（動態記錄實體撥出通話） ============ */}
           <div className={view === "f5" ? "hh-card rounded-lg p-5 space-y-4" : "hidden hh-card rounded-lg p-5 space-y-4"}>
             <div className="flex justify-between items-center border-b border-[#9aa3b4] pb-2">
               <h2 className="text-base font-bold text-[#202731] flex items-center gap-2">
                 <i data-lucide="phone-call" className="w-5 h-5 text-[#0056b3]" />
-                AI 外部語音通話與採購報修紀錄明細
+                {langMode === "en"
+                  ? "AI Outbound Voice Telephony & Procurement Tickets"
+                  : "AI 外部語音通話與採購報修紀錄明細"}
               </h2>
               <span className="text-xs font-mono text-slate-600">OUTBOUND AI LOG</span>
             </div>
             <div className="space-y-3 text-xs">
-              <div className="p-3 bg-white rounded border space-y-2">
-                <div className="flex justify-between font-mono">
-                  <span className="font-bold text-rose-700">● 機械手臂原廠緊急維修窗口 (通話 52 秒)</span>
-                  <span className="text-slate-500">2026-09-19 13:10:15</span>
+              {supplierCalls.map((call) => (
+                <div key={call.id} className="p-3 bg-white rounded border space-y-2 shadow-sm">
+                  <div className="flex justify-between font-mono">
+                    <span className={`font-bold ${call.type === "repair" ? "text-rose-700" : "text-amber-800"}`}>
+                      ● {call.target} ({call.duration})
+                    </span>
+                    <span className="text-slate-500">{call.time}</span>
+                  </div>
+                  <div className="p-2 bg-slate-50 border rounded text-[11px] leading-relaxed text-slate-700">
+                    <div>{call.aiSay}</div>
+                    <div className="mt-1 text-slate-800 font-medium">{call.respSay}</div>
+                  </div>
+                  <div className="text-[11px] text-emerald-700 font-bold">{call.po}</div>
                 </div>
-                <div className="p-2 bg-slate-50 border rounded text-[11px] leading-relaxed text-slate-700">
-                  AI:「2號手臂發生 E-402 伺服負載 142% 警報，現場無障礙物，判定內部卡料需工程師到廠。」<br />
-                  原廠:「工單已成立，已指派工程師攜帶備品，預計 15:00 前抵達。」
-                </div>
-                <div className="text-[11px] text-emerald-700 font-bold">工單編號：#TICKET-8902 (預約確認)</div>
-              </div>
-              <div className="p-3 bg-white rounded border space-y-2">
-                <div className="flex justify-between font-mono">
-                  <span className="font-bold text-amber-800">● 晉茂鋼鐵業務窗口 (通話 38 秒)</span>
-                  <span className="text-slate-500">2026-09-19 12:45:00</span>
-                </div>
-                <div className="p-2 bg-slate-50 border rounded text-[11px] leading-relaxed text-slate-700">
-                  AI:「李經理，S45C Ø50 圓棒庫存已跌破安全線，請依協議緊急配送 200 支。」<br />
-                  供應商:「有現貨，已排明日第一班車送達。」
-                </div>
-                <div className="text-[11px] text-emerald-700 font-bold">EDI 採購單：#PO-20260919-01 (已出單)</div>
-              </div>
+              ))}
             </div>
           </div>
 
@@ -2118,36 +2527,27 @@ export default function Home() {
         {/* ============ 右側：F1–F7 軟鍵 ＋ F8 警報 ＋ Model宇宙 語音管家 ============ */}
         <aside className="w-full lg:w-72 flex flex-col gap-3">
           <div className="flex flex-col gap-2">
-            <button type="button" onClick={() => switchTab("f1")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === "f1" ? " active" : ""}`}>
-              <span className="font-mono text-sm">F1: 流程監控總覽</span>
-              <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
-            </button>
-            <button type="button" onClick={() => switchTab("f2")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === "f2" ? " active" : ""}`}>
-              <span className="font-mono text-sm">F2: AGV 車隊手動調度</span>
-              <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
-            </button>
-            <button type="button" onClick={() => switchTab("f3")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === "f3" ? " active" : ""}`}>
-              <span className="font-mono text-sm">F3: 手臂軸向數據分析</span>
-              <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
-            </button>
-            <button type="button" onClick={() => switchTab("f4")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === "f4" ? " active" : ""}`}>
-              <span className="font-mono text-sm">F4: 原料庫存與補叫料</span>
-              <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
-            </button>
-            <button type="button" onClick={() => switchTab("f5")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === "f5" ? " active" : ""}`}>
-              <span className="font-mono text-sm">F5: AI 外部通訊錄明細</span>
-              <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
-            </button>
-            <button type="button" onClick={() => switchTab("f6")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === "f6" ? " active" : ""}`}>
-              <span className="font-mono text-sm">F6: 智能品檢與尺寸公差</span>
-              <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
-            </button>
-            <button type="button" onClick={() => switchTab("f7")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === "f7" ? " active" : ""}`}>
-              <span className="font-mono text-sm">F7: 綠色能源與設備健康</span>
-              <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
-            </button>
-            <button type="button" onClick={clearAlarm} className="py-3 px-3.5 rounded-lg text-left text-xs font-bold bg-[#b71c1c] hover:bg-[#c62828] text-white border border-[#7f0000] shadow-md flex justify-between items-center transition">
-              <span className="font-mono text-sm font-bold">F8: 警報靜音 / 重置</span>
+            {(["f1", "f2", "f3", "f4", "f5", "f6", "f7"] as ViewKey[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => switchTab(k)}
+                className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === k ? " active" : ""}`}
+              >
+                <span className="font-mono text-sm">
+                  {langMode === "en" ? TAB_NAMES_EN[k] : TAB_NAMES[k]}
+                </span>
+                <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={clearAlarm}
+              className="py-3 px-3.5 rounded-lg text-left text-xs font-bold bg-[#b71c1c] hover:bg-[#c62828] text-white border border-[#7f0000] shadow-md flex justify-between items-center transition"
+            >
+              <span className="font-mono text-sm font-bold">
+                {langMode === "en" ? "F8: Mute / Reset Alarm" : "F8: 警報靜音 / 重置"}
+              </span>
               <i data-lucide="bell-off" className="w-4 h-4 text-rose-200" />
             </button>
           </div>
@@ -2155,145 +2555,24 @@ export default function Home() {
           {/* 15 大現場語音快捷事件（通用 CNC-640 控制台介面） */}
           <div className="mt-3 pt-2.5 border-t-2 border-[#9aa3b4] flex flex-col gap-1.5">
             <div className="text-[11px] font-bold text-slate-700 tracking-wider uppercase flex justify-between items-center">
-              <span>現場事件 / 語音直達</span>
-              <span className="text-[9px] font-mono bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-bold">15 快捷</span>
+              <span>{langMode === "en" ? "Voice Action Shortcuts" : "現場事件 / 語音直達"}</span>
+              <span className="text-[9px] font-mono bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-bold">
+                {langMode === "en" ? "15 ACTIONS" : "15 快捷"}
+              </span>
             </div>
             <div className="grid grid-cols-1 gap-1">
-              <button
-                type="button"
-                onClick={() => sendQuick("智慧戰情報告")}
-                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 shadow-sm flex items-center justify-between transition"
-                title="智慧戰情報告（診斷 5 站、瓶頸、伺服負載與物料）"
-              >
-                <span>📊 智慧戰情報告</span>
-                <span className="text-[9px] font-mono text-indigo-500 font-bold">F1</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("最新品檢報告")}
-                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 shadow-sm flex items-center justify-between transition"
-                title="最新品檢報告（CMM 三次元測量與 AI 瑕疵）"
-              >
-                <span>🔬 最新品檢報告</span>
-                <span className="text-[9px] font-mono text-purple-500 font-bold">F6</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("廠房即時能耗")}
-                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm flex items-center justify-between transition"
-                title="廠房即時能耗（功率、累計度數、電費、碳排）"
-              >
-                <span>⚡ 廠房即時能耗</span>
-                <span className="text-[9px] font-mono text-emerald-500 font-bold">F7</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("設備預測健康")}
-                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-cyan-50 hover:bg-cyan-100 text-cyan-900 border border-cyan-200 shadow-sm flex items-center justify-between transition"
-                title="設備預測健康（主軸軸承頻譜、潤滑油、切削水）"
-              >
-                <span>🛡️ 設備預測健康</span>
-                <span className="text-[9px] font-mono text-cyan-500 font-bold">F7</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("換切燃油閥體")}
-                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 shadow-sm flex items-center justify-between transition"
-                title="換切工單 B202 航太高壓燃油閥體"
-              >
-                <span>🔄 換切燃油閥體</span>
-                <span className="text-[9px] font-mono text-blue-500 font-bold">MES</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("查 414 警報")}
-                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-900 border border-rose-300 shadow-sm flex items-center justify-between transition"
-                title="查詢 414 警報原因與排除步驟（啟動故障演練連鎖）"
-              >
-                <span>🔍 查 414 警報</span>
-                <span className="text-[9px] font-mono text-rose-600 font-bold">ALARM</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("F3 手臂軸向")}
-                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 shadow-sm flex items-center justify-between transition"
-                title="查看 F3 機械手臂 6 軸扭力與刀庫"
-              >
-                <span>🦾 F3 手臂軸向</span>
-                <span className="text-[9px] font-mono text-slate-500 font-bold">F3</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("開立維修單")}
-                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 shadow-sm flex items-center justify-between transition"
-                title="為 M03 開立高優先度維修單並同步主管看板"
-              >
-                <span>📝 開立維修單</span>
-                <span className="text-[9px] font-mono text-amber-600 font-bold">DISPATCH</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("解除警報")}
-                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-rose-100 hover:bg-rose-200 text-rose-950 border border-rose-400 shadow-sm flex items-center justify-between transition"
-                title="解除警報（04 加工區恢復運作、警報面板收回）"
-              >
-                <span>🔕 解除警報</span>
-                <span className="text-[9px] font-mono text-rose-700 font-bold">RESET</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("解除 RT-1001")}
-                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-sm flex items-center justify-between transition"
-                title="維修完工解除 RT-1001 並結案"
-              >
-                <span>✅ 解除 RT-1001</span>
-                <span className="text-[9px] font-mono text-emerald-600 font-bold">RESOLVE</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("今日工廠日報")}
-                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 shadow-sm flex items-center justify-between transition"
-                title="今日工廠日報（開單、結案、催料、低庫存提醒）"
-              >
-                <span>📋 今日工廠日報</span>
-                <span className="text-[9px] font-mono text-slate-500 font-bold">REPORT</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("刀具磨損預警")}
-                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 shadow-sm flex items-center justify-between transition"
-                title="刀具磨損狀態與更換備刀預警"
-              >
-                <span>🗡️ 刀具磨損預警</span>
-                <span className="text-[9px] font-mono text-amber-600 font-bold">TOOL</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("今日產量進度")}
-                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 shadow-sm flex items-center justify-between transition"
-                title="今日生產進度與當班達成率"
-              >
-                <span>🎯 今日產量進度</span>
-                <span className="text-[9px] font-mono text-slate-500 font-bold">PROD</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("切削倒數時間")}
-                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 shadow-sm flex items-center justify-between transition"
-                title="當前工件切削剩餘倒數時間"
-              >
-                <span>⏱️ 切削倒數時間</span>
-                <span className="text-[9px] font-mono text-slate-500 font-bold">CYCLE</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("OEE與停機損失")}
-                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 shadow-sm flex items-center justify-between transition"
-                title="查詢工廠 OEE 總體設備效率"
-              >
-                <span>📈 OEE與停機損失</span>
-                <span className="text-[9px] font-mono text-slate-500 font-bold">OEE</span>
-              </button>
+              {QUICK_ACTIONS.map((q) => (
+                <button
+                  key={q.id}
+                  type="button"
+                  onClick={() => sendQuick(langMode === "en" ? q.cmdEn : q.cmdZh)}
+                  className={`py-1.5 px-2 rounded text-left text-xs font-semibold shadow-sm flex items-center justify-between transition border ${q.btnClass}`}
+                  title={langMode === "en" ? q.descEn : q.descZh}
+                >
+                  <span>{langMode === "en" ? q.nameEn : q.nameZh}</span>
+                  <span className={`text-[9px] font-mono font-bold ${q.tagClass}`}>{q.tag}</span>
+                </button>
+              ))}
             </div>
           </div>
         </aside>
@@ -2319,7 +2598,7 @@ export default function Home() {
               <div className="flex items-center gap-1.5">
                 <span className="text-[#0056b3] text-sm" aria-hidden="true">●</span>
                 <span className="text-xs font-bold text-[#202731]">
-                  MODEL宇宙 語音管家
+                  {langMode === "en" ? "MODEL Universe (AI Voice)" : "MODEL宇宙 語音管家"}
                 </span>
                 {bridge.status === "listening" && (
                   <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 animate-pulse">
@@ -2344,6 +2623,20 @@ export default function Home() {
               </div>
 
               <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = langMode === "zh" ? "en" : "zh";
+                    setLangMode(next);
+                    const msg = next === "en" ? "Switched to English voice mode." : "已切換為繁體中文語音模式。";
+                    setMvReply(msg);
+                    speak(msg, next);
+                  }}
+                  title="Switch language: English / 繁體中文"
+                  className="text-[10px] font-mono px-1.5 py-0.5 rounded border font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300"
+                >
+                  {langMode === "en" ? "🌐 EN" : "🌐 中"}
+                </button>
                 <button
                   type="button"
                   onClick={() => setLiveModeWanted((prev) => !prev)}
@@ -2483,111 +2776,17 @@ export default function Home() {
 
             {/* 快速語音指令膠囊（裁判 / 現場 1-click 測試） */}
             <div className="flex flex-wrap gap-1">
-              <button
-                type="button"
-                onClick={() => sendQuick("智慧戰情報告")}
-                className="text-[10px] px-2 py-1 rounded bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-400 text-indigo-800 border border-indigo-200 font-semibold transition"
-              >
-                📊 智慧戰情報告
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("最新品檢報告")}
-                className="text-[10px] px-2 py-1 rounded bg-purple-50 hover:bg-purple-100 hover:border-purple-400 text-purple-800 border border-purple-200 font-semibold transition"
-              >
-                🔬 最新品檢報告
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("廠房即時能耗")}
-                className="text-[10px] px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-400 text-emerald-800 border border-emerald-200 font-semibold transition"
-              >
-                ⚡ 廠房即時能耗
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("設備預測健康")}
-                className="text-[10px] px-2 py-1 rounded bg-cyan-50 hover:bg-cyan-100 hover:border-cyan-400 text-cyan-800 border border-cyan-200 font-semibold transition"
-              >
-                🛡️ 設備預測健康
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("換切燃油閥體")}
-                className="text-[10px] px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 hover:border-blue-400 text-blue-800 border border-blue-200 font-semibold transition"
-              >
-                🔄 換切燃油閥體
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("查 414 警報")}
-                className="text-[10px] px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 hover:border-rose-300 text-rose-800 border border-rose-200 font-semibold transition"
-              >
-                🔍 查 414 警報
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("F3 手臂軸向")}
-                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
-              >
-                🦾 F3 手臂軸向
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("開立維修單")}
-                className="text-[10px] px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 hover:border-amber-400 text-amber-800 border border-amber-300 transition"
-              >
-                📝 開立維修單
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("解除警報")}
-                className="text-[10px] px-2 py-1 rounded bg-rose-100 hover:bg-rose-200 hover:border-rose-400 text-rose-900 border border-rose-300 font-semibold transition"
-              >
-                🔕 解除警報
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("解除 RT-1001")}
-                className="text-[10px] px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 text-emerald-800 border border-emerald-300 font-semibold transition"
-              >
-                ✅ 解除 RT-1001
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("今日工廠日報")}
-                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
-              >
-                📋 今日工廠日報
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("刀具磨損預警")}
-                className="text-[10px] px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 hover:border-amber-400 text-amber-800 border border-amber-300 transition"
-              >
-                🗡️ 刀具磨損預警
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("今日產量進度")}
-                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
-              >
-                🎯 今日產量進度
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("切削倒數時間")}
-                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
-              >
-                ⏱️ 切削倒數時間
-              </button>
-              <button
-                type="button"
-                onClick={() => sendQuick("OEE與停機損失")}
-                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-rose-100 hover:border-rose-300 text-slate-700 border border-slate-300 transition"
-              >
-                📈 OEE與停機損失
-              </button>
+              {QUICK_ACTIONS.map((q) => (
+                <button
+                  key={q.id}
+                  type="button"
+                  onClick={() => sendQuick(langMode === "en" ? q.cmdEn : q.cmdZh)}
+                  className={`text-[10px] px-2 py-1 rounded font-semibold transition border ${q.btnClass}`}
+                  title={langMode === "en" ? q.descEn : q.descZh}
+                >
+                  {langMode === "en" ? q.nameEn : q.nameZh}
+                </button>
+              ))}
             </div>
 
             {/* 打字輸入框 */}
@@ -2607,7 +2806,11 @@ export default function Home() {
                 name="mv-command"
                 value={mvDraft}
                 onChange={(e) => setMvDraft(e.target.value)}
-                placeholder="輸入指令，或直接喊「宇宙」用講的..."
+                placeholder={
+                  langMode === "en"
+                    ? "Enter voice command or say 'Universe'..."
+                    : "輸入指令，或直接喊「宇宙」用講的..."
+                }
                 autoComplete="off"
                 className="flex-1 rounded border border-slate-400 bg-white px-2 py-1.5 text-xs text-slate-800 focus:outline-blue-500"
               />
@@ -2615,7 +2818,7 @@ export default function Home() {
                 type="submit"
                 className="rounded bg-[#0056b3] hover:bg-blue-700 px-3 py-1.5 text-xs font-bold text-white transition"
               >
-                送出
+                {langMode === "en" ? "Send" : "送出"}
               </button>
             </form>
           </div>
