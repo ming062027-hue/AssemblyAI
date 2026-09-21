@@ -61,11 +61,16 @@ const TAB_NAMES_EN: Record<ViewKey, string> = {
 interface SupplierCallRecord {
   id: string;
   target: string;
+  targetEn?: string;
   duration: string;
+  durationEn?: string;
   time: string;
   aiSay: string;
+  aiSayEn?: string;
   respSay: string;
+  respSayEn?: string;
   po: string;
+  poEn?: string;
   type: "repair" | "material";
 }
 
@@ -390,21 +395,31 @@ export default function Home() {
     {
       id: "TICKET-8902",
       target: "機械手臂原廠緊急維修窗口",
+      targetEn: "Robot Arm OEM Emergency Service Desk",
       duration: "通話 52 秒",
+      durationEn: "Call 52s",
       time: "2026-09-19 13:10:15",
       aiSay: "2號手臂發生 E-402 伺服負載 142% 警報，現場無障礙物，判定內部卡料需工程師到廠。",
+      aiSayEn: "Robot Arm #2 triggered E-402 Servo Overload at 142%. Workspace clear; internal mechanical jam diagnosed, field engineer requested.",
       respSay: "工單已成立，已指派工程師攜帶備品，預計 15:00 前抵達。",
+      respSayEn: "Ticket confirmed. Field engineer dispatched with spare parts, ETA before 15:00.",
       po: "工單編號：#TICKET-8902 (預約確認)",
+      poEn: "Ticket ID: #TICKET-8902 (Confirmed)",
       type: "repair",
     },
     {
       id: "PO-20260919-01",
       target: "晉茂鋼鐵業務窗口",
+      targetEn: "Jinmao Steel Sales Desk",
       duration: "通話 38 秒",
+      durationEn: "Call 38s",
       time: "2026-09-19 12:45:00",
       aiSay: "李經理，S45C Ø50 圓棒庫存已跌破安全線，請依協議緊急配送 200 支。",
+      aiSayEn: "Manager Li, S45C Ø50 bar stock dropped below safety line. Please expedite delivery of 200 pcs per SLA.",
       respSay: "有現貨，已排明日第一班車送達。",
+      respSayEn: "In stock. Scheduled for first priority truck delivery tomorrow morning.",
       po: "EDI 採購單：#PO-20260919-01 (已出單)",
+      poEn: "EDI Purchase Order: #PO-20260919-01 (Issued)",
       type: "material",
     },
   ]);
@@ -627,16 +642,17 @@ export default function Home() {
         setSupplierCalls((prev) => [
           {
             id: poNum,
-            target: isEn ? "Jinmao Steel Outbound Supply" : "晉茂鋼鐵業務窗口 (AI自動催料)",
-            duration: isEn ? "Call 32s" : "通話 32 秒",
+            target: "晉茂鋼鐵業務窗口 (AI自動催料)",
+            targetEn: "Jinmao Steel Outbound Supply (AI Auto-Urge)",
+            duration: "通話 32 秒",
+            durationEn: "Call 32s",
             time: new Date().toLocaleTimeString(),
-            aiSay: isEn
-              ? `AI: "Emergency stock replenishment: CNC-640 S45C bar inventory critical at 35 pcs. Need expedited delivery."`
-              : `AI:「晉茂鋼鐵您好，CNC-640 目前 S45C Ø50 圓棒庫存僅剩 35 支，請依協議急件配送 20 支。」`,
-            respSay: isEn
-              ? `Supplier: "Received! 20 pcs loaded on priority truck, ETA 14:30 at factory dock."`
-              : `供應商:「收到！倉庫現貨已有 20 支裝車，預計下午 14:30 前專車直達工廠碼頭。」`,
-            po: `${isEn ? "Expedited PO: " : "EDI 採購單："}${poNum} (${isEn ? "Dispatched" : "已出單配送"})`,
+            aiSay: `AI:「晉茂鋼鐵您好，CNC-640 目前 S45C Ø50 圓棒庫存僅剩 35 支，請依協議急件配送 20 支。」`,
+            aiSayEn: `AI: "Emergency stock replenishment: CNC-640 S45C bar inventory critical at 35 pcs. Need expedited delivery of 20 pcs."`,
+            respSay: `供應商:「收到！倉庫現貨已有 20 支裝車，預計下午 14:30 前專車直達工廠碼頭。」`,
+            respSayEn: `Supplier: "Received! 20 pcs loaded on priority truck, ETA 14:30 at factory dock."`,
+            po: `EDI 採購單：${poNum} (已出單配送)`,
+            poEn: `Expedited PO: ${poNum} (Dispatched)`,
             type: "material",
           },
           ...prev,
@@ -1774,7 +1790,7 @@ export default function Home() {
                 className="w-full py-2.5 rounded-lg text-sm font-bold bg-[#b71c1c] hover:bg-[#c62828] text-white border border-[#7f0000] shadow-md transition flex items-center justify-center gap-2"
               >
                 <span aria-hidden="true">●</span>
-                解除警報（跟語音「解除警報」/ F6 同一個功能）
+                {langMode === "en" ? "Mute & Reset Alarm (Voice 'Clear Alarm' or F8)" : "解除警報（跟語音「解除警報」/ F8 同一個功能）"}
               </button>
               </div>
             )}
@@ -1785,7 +1801,7 @@ export default function Home() {
             <div className="flex justify-between items-center border-b border-[#9aa3b4] pb-2">
               <h2 className="text-base font-bold text-[#202731] flex items-center gap-2">
                 <i data-lucide="truck" className="w-5 h-5 text-[#0056b3]" />
-                AGV 車隊手動即時調度中心
+                {langMode === "en" ? "AGV Fleet Manual & Autonomous Dispatch Center" : "AGV 車隊手動即時調度中心"}
               </h2>
               <span className="text-xs font-mono text-slate-600">FLEET: 4 UNITS ACTIVE</span>
             </div>
@@ -1793,7 +1809,9 @@ export default function Home() {
               <div className="lg:col-span-7 bg-slate-900 rounded-lg overflow-hidden border-2 border-slate-700 relative shadow-inner">
                 <div className="absolute top-2 left-3 z-10 flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping" />
-                  <span className="font-mono text-xs font-bold text-white bg-black/60 px-2 py-0.5 rounded">● CAM-01: AGV-02 導航前視鏡頭 [LIVE]</span>
+                  <span className="font-mono text-xs font-bold text-white bg-black/60 px-2 py-0.5 rounded">
+                    {langMode === "en" ? "● CAM-01: AGV-02 Nav Camera [LIVE]" : "● CAM-01: AGV-02 導航前視鏡頭 [LIVE]"}
+                  </span>
                 </div>
                 <div className="absolute top-2 right-3 z-10 font-mono text-[11px] text-emerald-400 bg-black/60 px-2 py-0.5 rounded">
                   30 FPS • 1080P • LiDAR ON
@@ -1806,7 +1824,7 @@ export default function Home() {
                   <div className="relative w-full h-24 flex items-center justify-center">
                     <div className="w-48 h-full border-b-4 border-l-2 border-r-2 border-cyan-400/50 rounded-b-3xl" />
                     <div className="absolute text-[10px] font-mono text-cyan-300 bg-cyan-950/80 px-2 py-0.5 border border-cyan-500 rounded">
-                      路徑鎖定：➔ 1號手臂備料區 (7.4m)
+                      {langMode === "en" ? "Route Locked: ➔ Arm 1 Staging (7.4m)" : "路徑鎖定：➔ 1號手臂備料區 (7.4m)"}
                     </div>
                   </div>
                   <div className="flex justify-between items-center text-[10px] font-mono text-slate-400">
@@ -1818,14 +1836,18 @@ export default function Home() {
               <div className="lg:col-span-5 space-y-3">
                 <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold font-mono text-xs">AGV-01 (下料搬運車)</span>
-                    <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold">運行中</span>
+                    <span className="font-bold font-mono text-xs">{langMode === "en" ? "AGV-01 (Inbound Transport)" : "AGV-01 (下料搬運車)"}</span>
+                    <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold">
+                      {langMode === "en" ? "RUNNING" : "運行中"}
+                    </span>
                   </div>
-                  <div className="text-[11px] text-slate-600">碼頭卸貨 ➜ WMS 立體庫 (電量 88%)</div>
+                  <div className="text-[11px] text-slate-600">
+                    {langMode === "en" ? "Dock Unload ➜ WMS Storage (Battery 88%)" : "碼頭卸貨 ➜ WMS 立體庫 (電量 88%)"}
+                  </div>
                   {/* 動態搬運進度條 */}
                   <div className="space-y-1">
                     <div className="flex justify-between text-[10px] font-mono text-slate-500">
-                      <span>路徑進度: 碼頭 A ➔ 立體倉 03</span>
+                      <span>{langMode === "en" ? "Route: Dock A ➔ High-Bay 03" : "路徑進度: 碼頭 A ➔ 立體倉 03"}</span>
                       <span className="text-blue-600 font-bold">{heartbeat.agv1Progress}%</span>
                     </div>
                     <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
@@ -1836,20 +1858,28 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="flex gap-2 pt-1">
-                    <button type="button" onClick={() => dispatchAgv("AGV-01", "返回碼頭")} className="flex-1 py-1.5 bg-slate-200 hover:bg-slate-300 rounded text-xs font-bold">調回碼頭</button>
-                    <button type="button" onClick={() => dispatchAgv("AGV-01", "前往充電樁")} className="py-1.5 px-3 bg-slate-200 hover:bg-slate-300 rounded text-xs font-bold">回充</button>
+                    <button type="button" onClick={() => dispatchAgv("AGV-01", "返回碼頭")} className="flex-1 py-1.5 bg-slate-200 hover:bg-slate-300 rounded text-xs font-bold">
+                      {langMode === "en" ? "Return to Dock" : "調回碼頭"}
+                    </button>
+                    <button type="button" onClick={() => dispatchAgv("AGV-01", "前往充電樁")} className="py-1.5 px-3 bg-slate-200 hover:bg-slate-300 rounded text-xs font-bold">
+                      {langMode === "en" ? "Recharge" : "回充"}
+                    </button>
                   </div>
                 </div>
                 <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold font-mono text-xs">AGV-02 (補料出庫車)</span>
-                    <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">視訊連線中</span>
+                    <span className="font-bold font-mono text-xs">{langMode === "en" ? "AGV-02 (Feeder Transport)" : "AGV-02 (補料出庫車)"}</span>
+                    <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
+                      {langMode === "en" ? "VIDEO LIVE" : "視訊連線中"}
+                    </span>
                   </div>
-                  <div className="text-[11px] text-slate-600">立體倉出料口待命位 (電量 95%)</div>
+                  <div className="text-[11px] text-slate-600">
+                    {langMode === "en" ? "High-Bay Output Staging (Battery 95%)" : "立體倉出料口待命位 (電量 95%)"}
+                  </div>
                   {/* 動態補料進度條 */}
                   <div className="space-y-1">
                     <div className="flex justify-between text-[10px] font-mono text-slate-500">
-                      <span>補料路徑: 立體倉 ➔ 1號手臂</span>
+                      <span>{langMode === "en" ? "Feed Route: High-Bay ➔ Arm 1" : "補料路徑: 立體倉 ➔ 1號手臂"}</span>
                       <span className="text-amber-600 font-bold">{heartbeat.agv2Progress}%</span>
                     </div>
                     <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
@@ -1860,8 +1890,12 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="flex gap-2 pt-1">
-                    <button type="button" onClick={() => dispatchAgv("AGV-02", "送料至 1 號手臂")} className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold">補料至 1 號手臂</button>
-                    <button type="button" onClick={() => dispatchAgv("AGV-02", "送料至 2 號手臂")} className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold">補料至 2 號手臂</button>
+                    <button type="button" onClick={() => dispatchAgv("AGV-02", "送料至 1 號手臂")} className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold">
+                      {langMode === "en" ? "Feed to Arm 1" : "補料至 1 號手臂"}
+                    </button>
+                    <button type="button" onClick={() => dispatchAgv("AGV-02", "送料至 2 號手臂")} className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold">
+                      {langMode === "en" ? "Feed to Arm 2" : "補料至 2 號手臂"}
+                    </button>
                   </div>
                 </div>
                 {agvMsg && (
@@ -1878,7 +1912,9 @@ export default function Home() {
             <div className="flex justify-between items-center border-b border-[#9aa3b4] pb-2">
               <h2 className="text-base font-bold text-[#202731] flex items-center gap-2">
                 <i data-lucide="activity" className="w-5 h-5 text-[#0056b3]" />
-                六軸機械手臂精細數據與扭矩頻譜分析 (ROBOT-02)
+                {langMode === "en"
+                  ? "6-Axis Robotic Arm Telemetry & Torque Spectrum (ROBOT-02)"
+                  : "六軸機械手臂精細數據與扭矩頻譜分析 (ROBOT-02)"}
               </h2>
               {isAlarm ? (
                 <span className="text-xs font-mono font-bold text-rose-700 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded">
@@ -1893,90 +1929,141 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 font-mono">
               <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-slate-800">J1 底座旋轉軸 (BASE)</span>
+                  <span className="font-bold text-slate-800">
+                    {langMode === "en" ? "J1 Base Rotation (BASE)" : "J1 底座旋轉軸 (BASE)"}
+                  </span>
                   <span className="font-bold text-emerald-700">32%</span>
                 </div>
                 <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
                   <div className="bg-emerald-600 h-full rounded-full" style={{ width: "32%" }} />
                 </div>
                 <div className="grid grid-cols-3 text-[10px] text-slate-600 pt-1 border-t border-slate-200">
-                  <div>角度: +124.5°</div><div>轉速: 120 RPM</div><div>電流: 4.2 A</div><div>溫度: 42°C</div><div>振動: 0.8 mm/s</div><div className="text-emerald-700 font-bold">狀態: 正常</div>
+                  <div>{langMode === "en" ? "Angle: +124.5°" : "角度: +124.5°"}</div>
+                  <div>{langMode === "en" ? "Speed: 120 RPM" : "轉速: 120 RPM"}</div>
+                  <div>{langMode === "en" ? "Current: 4.2 A" : "電流: 4.2 A"}</div>
+                  <div>{langMode === "en" ? "Temp: 42°C" : "溫度: 42°C"}</div>
+                  <div>{langMode === "en" ? "Vib: 0.8 mm/s" : "振動: 0.8 mm/s"}</div>
+                  <div className="text-emerald-700 font-bold">{langMode === "en" ? "Status: OK" : "狀態: 正常"}</div>
                 </div>
               </div>
               {/* J2：警報時 142% 紅卡；解除後跟著轉正常綠卡（跟語音說的同步） */}
               {isAlarm ? (
               <div className="p-3 bg-rose-50 border-2 border-rose-500 rounded space-y-2 shadow-sm">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-black text-rose-900">J2 大臂俯仰軸 (SHOULDER)</span>
-                  <span className="font-black text-rose-700 animate-pulse">142% [超標]</span>
+                  <span className="font-black text-rose-900">
+                    {langMode === "en" ? "J2 Shoulder Pitch (SHOULDER)" : "J2 大臂俯仰軸 (SHOULDER)"}
+                  </span>
+                  <span className="font-black text-rose-700 animate-pulse">
+                    {langMode === "en" ? "142% [OVERLOAD]" : "142% [超標]"}
+                  </span>
                 </div>
                 <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
                   <div className="bg-rose-600 h-full rounded-full" style={{ width: "100%" }} />
                 </div>
                 <div className="grid grid-cols-3 text-[10px] text-rose-900 pt-1 border-t border-rose-300 font-bold">
-                  <div>角度: -48.2°</div><div>轉速: 0 RPM</div><div className="text-rose-700">電流: 18.9 A</div><div>溫度: 78°C</div><div>振動: 4.6 mm/s</div><div className="text-rose-700">狀態: 卡死鎖定</div>
+                  <div>{langMode === "en" ? "Angle: -48.2°" : "角度: -48.2°"}</div>
+                  <div>{langMode === "en" ? "Speed: 0 RPM" : "轉速: 0 RPM"}</div>
+                  <div className="text-rose-700">{langMode === "en" ? "Current: 18.9 A" : "電流: 18.9 A"}</div>
+                  <div>{langMode === "en" ? "Temp: 78°C" : "溫度: 78°C"}</div>
+                  <div>{langMode === "en" ? "Vib: 4.6 mm/s" : "振動: 4.6 mm/s"}</div>
+                  <div className="text-rose-700">{langMode === "en" ? "Status: LOCKED" : "狀態: 卡死鎖定"}</div>
                 </div>
               </div>
               ) : (
               <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-slate-800">J2 大臂俯仰軸 (SHOULDER)</span>
+                  <span className="font-bold text-slate-800">
+                    {langMode === "en" ? "J2 Shoulder Pitch (SHOULDER)" : "J2 大臂俯仰軸 (SHOULDER)"}
+                  </span>
                   <span className="font-bold text-emerald-700">36%</span>
                 </div>
                 <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
                   <div className="bg-emerald-600 h-full rounded-full" style={{ width: "36%" }} />
                 </div>
                 <div className="grid grid-cols-3 text-[10px] text-slate-600 pt-1 border-t border-slate-200">
-                  <div>角度: -48.2°</div><div>轉速: 90 RPM</div><div>電流: 5.1 A</div><div>溫度: 45°C</div><div>振動: 0.9 mm/s</div><div className="text-emerald-700 font-bold">狀態: 正常</div>
+                  <div>{langMode === "en" ? "Angle: -48.2°" : "角度: -48.2°"}</div>
+                  <div>{langMode === "en" ? "Speed: 90 RPM" : "轉速: 90 RPM"}</div>
+                  <div>{langMode === "en" ? "Current: 5.1 A" : "電流: 5.1 A"}</div>
+                  <div>{langMode === "en" ? "Temp: 45°C" : "溫度: 45°C"}</div>
+                  <div>{langMode === "en" ? "Vib: 0.9 mm/s" : "振動: 0.9 mm/s"}</div>
+                  <div className="text-emerald-700 font-bold">{langMode === "en" ? "Status: OK" : "狀態: 正常"}</div>
                 </div>
               </div>
               )}
               <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-slate-800">J3 小臂關節軸 (ELBOW)</span>
+                  <span className="font-bold text-slate-800">
+                    {langMode === "en" ? "J3 Elbow Joint (ELBOW)" : "J3 小臂關節軸 (ELBOW)"}
+                  </span>
                   <span className="font-bold text-emerald-700">28%</span>
                 </div>
                 <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
                   <div className="bg-emerald-600 h-full rounded-full" style={{ width: "28%" }} />
                 </div>
                 <div className="grid grid-cols-3 text-[10px] text-slate-600 pt-1 border-t border-slate-200">
-                  <div>角度: +98.0°</div><div>轉速: 85 RPM</div><div>電流: 3.8 A</div><div>溫度: 39°C</div><div>振動: 0.6 mm/s</div><div className="text-emerald-700 font-bold">狀態: 正常</div>
+                  <div>{langMode === "en" ? "Angle: +98.0°" : "角度: +98.0°"}</div>
+                  <div>{langMode === "en" ? "Speed: 85 RPM" : "轉速: 85 RPM"}</div>
+                  <div>{langMode === "en" ? "Current: 3.8 A" : "電流: 3.8 A"}</div>
+                  <div>{langMode === "en" ? "Temp: 39°C" : "溫度: 39°C"}</div>
+                  <div>{langMode === "en" ? "Vib: 0.6 mm/s" : "振動: 0.6 mm/s"}</div>
+                  <div className="text-emerald-700 font-bold">{langMode === "en" ? "Status: OK" : "狀態: 正常"}</div>
                 </div>
               </div>
               <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-slate-800">J4 腕部旋轉軸 (WRIST 1)</span>
+                  <span className="font-bold text-slate-800">
+                    {langMode === "en" ? "J4 Wrist Rotation (WRIST 1)" : "J4 腕部旋轉軸 (WRIST 1)"}
+                  </span>
                   <span className="font-bold text-emerald-700">15%</span>
                 </div>
                 <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
                   <div className="bg-emerald-600 h-full rounded-full" style={{ width: "15%" }} />
                 </div>
                 <div className="grid grid-cols-3 text-[10px] text-slate-600 pt-1 border-t border-slate-200">
-                  <div>角度: +0.0°</div><div>轉速: 0 RPM</div><div>電流: 1.2 A</div><div>溫度: 35°C</div><div>振動: 0.2 mm/s</div><div className="text-emerald-700 font-bold">狀態: 正常</div>
+                  <div>{langMode === "en" ? "Angle: +0.0°" : "角度: +0.0°"}</div>
+                  <div>{langMode === "en" ? "Speed: 0 RPM" : "轉速: 0 RPM"}</div>
+                  <div>{langMode === "en" ? "Current: 1.2 A" : "電流: 1.2 A"}</div>
+                  <div>{langMode === "en" ? "Temp: 35°C" : "溫度: 35°C"}</div>
+                  <div>{langMode === "en" ? "Vib: 0.2 mm/s" : "振動: 0.2 mm/s"}</div>
+                  <div className="text-emerald-700 font-bold">{langMode === "en" ? "Status: OK" : "狀態: 正常"}</div>
                 </div>
               </div>
               <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-slate-800">J5 腕部俯仰軸 (WRIST 2)</span>
+                  <span className="font-bold text-slate-800">
+                    {langMode === "en" ? "J5 Wrist Pitch (WRIST 2)" : "J5 腕部俯仰軸 (WRIST 2)"}
+                  </span>
                   <span className="font-bold text-emerald-700">18%</span>
                 </div>
                 <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
                   <div className="bg-emerald-600 h-full rounded-full" style={{ width: "18%" }} />
                 </div>
                 <div className="grid grid-cols-3 text-[10px] text-slate-600 pt-1 border-t border-slate-200">
-                  <div>角度: -30.0°</div><div>轉速: 0 RPM</div><div>電流: 1.6 A</div><div>溫度: 36°C</div><div>振動: 0.3 mm/s</div><div className="text-emerald-700 font-bold">狀態: 正常</div>
+                  <div>{langMode === "en" ? "Angle: -30.0°" : "角度: -30.0°"}</div>
+                  <div>{langMode === "en" ? "Speed: 0 RPM" : "轉速: 0 RPM"}</div>
+                  <div>{langMode === "en" ? "Current: 1.6 A" : "電流: 1.6 A"}</div>
+                  <div>{langMode === "en" ? "Temp: 36°C" : "溫度: 36°C"}</div>
+                  <div>{langMode === "en" ? "Vib: 0.3 mm/s" : "振動: 0.3 mm/s"}</div>
+                  <div className="text-emerald-700 font-bold">{langMode === "en" ? "Status: OK" : "狀態: 正常"}</div>
                 </div>
               </div>
               <div className="p-3 bg-white rounded border border-slate-300 space-y-2">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-slate-800">J6 末端法蘭夾爪 (FLANGE)</span>
+                  <span className="font-bold text-slate-800">
+                    {langMode === "en" ? "J6 End Flange Gripper (FLANGE)" : "J6 末端法蘭夾爪 (FLANGE)"}
+                  </span>
                   <span className="font-bold text-emerald-700">10%</span>
                 </div>
                 <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
                   <div className="bg-emerald-600 h-full rounded-full" style={{ width: "10%" }} />
                 </div>
                 <div className="grid grid-cols-3 text-[10px] text-slate-600 pt-1 border-t border-slate-200">
-                  <div>氣壓: 0.62 MPa</div><div>夾緊力: 150 N</div><div>電流: 0.9 A</div><div>開合行程: 45mm</div><div>磁簧感應: ON</div><div className="text-emerald-700 font-bold">狀態: 閉合保壓</div>
+                  <div>{langMode === "en" ? "Pressure: 0.62 MPa" : "氣壓: 0.62 MPa"}</div>
+                  <div>{langMode === "en" ? "Clamping: 150 N" : "夾緊力: 150 N"}</div>
+                  <div>{langMode === "en" ? "Current: 0.9 A" : "電流: 0.9 A"}</div>
+                  <div>{langMode === "en" ? "Stroke: 45mm" : "開合行程: 45mm"}</div>
+                  <div>{langMode === "en" ? "Sensor: ON" : "磁簧感應: ON"}</div>
+                  <div className="text-emerald-700 font-bold">{langMode === "en" ? "Status: CLAMPED" : "狀態: 閉合保壓"}</div>
                 </div>
               </div>
             </div>
@@ -1986,10 +2073,14 @@ export default function Home() {
               <div className="flex justify-between items-center border-b border-slate-200 pb-2">
                 <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
                   <i data-lucide="disc" className="w-4 h-4 text-[#0056b3]" />
-                  <span>CNC-640 刀庫 24 刀位動態壽命與磨損預警監控</span>
+                  <span>
+                    {langMode === "en"
+                      ? "CNC-640 24-Pocket Tool Magazine Life & Wear Telemetry"
+                      : "CNC-640 刀庫 24 刀位動態壽命與磨損預警監控"}
+                  </span>
                 </div>
                 <span className="text-[10px] font-mono text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded font-bold">
-                  ⚠ 1 支刀具接近磨損極限
+                  {langMode === "en" ? "⚠ 1 Tool Near Wear Limit" : "⚠ 1 支刀具接近磨損極限"}
                 </span>
               </div>
 
@@ -1997,6 +2088,20 @@ export default function Home() {
                 {heartbeat.tools.map((t) => {
                   const isCritical = t.life <= 15;
                   const isWarning = t.life <= 30 && t.life > 15;
+                  const toolLabel =
+                    langMode === "en"
+                      ? t.id === "T01"
+                        ? "Face Mill"
+                        : t.id === "T02"
+                        ? "Rough Mill"
+                        : t.id === "T03"
+                        ? "Ball Endmill"
+                        : t.id === "T04"
+                        ? "Center Drill"
+                        : t.id === "T05"
+                        ? "Micro Tap"
+                        : "Chamfer Tool"
+                      : t.name;
                   return (
                     <div
                       key={t.id}
@@ -2022,8 +2127,8 @@ export default function Home() {
                           {t.life}%
                         </span>
                       </div>
-                      <div className="text-[10px] text-slate-600 my-1 truncate" title={`${t.name} ${t.spec}`}>
-                        {t.name}
+                      <div className="text-[10px] text-slate-600 my-1 truncate" title={`${toolLabel} ${t.spec}`}>
+                        {toolLabel}
                       </div>
                       <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
                         <div
@@ -2034,9 +2139,11 @@ export default function Home() {
                         />
                       </div>
                       <div className="mt-1 text-[9px] text-slate-500 flex justify-between">
-                        <span>預估剩餘</span>
+                        <span>{langMode === "en" ? "Est. Remaining" : "預估剩餘"}</span>
                         <span className={isCritical ? "text-rose-700 font-bold" : ""}>
-                          {isCritical ? "12 分鐘" : "正常"}
+                          {isCritical
+                            ? (langMode === "en" ? "12 min" : "12 分鐘")
+                            : (langMode === "en" ? "Normal" : "正常")}
                         </span>
                       </div>
                     </div>
@@ -2046,14 +2153,17 @@ export default function Home() {
 
               <div className="p-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-900 flex items-center justify-between">
                 <span>
-                  💡 <strong>智慧刀具調度連動</strong>：T03 圓鼻銑刀壽命僅剩 12%，系統已自動排定於本工單完成後，引導 AGV-02 遞送新刀具至刀庫換刀位。
+                  💡 <strong>{langMode === "en" ? "Autonomous Tool Dispatch" : "智慧刀具調度連動"}</strong>：
+                  {langMode === "en"
+                    ? "T03 Endmill has 12% life remaining. AGV-02 scheduled to deliver replacement upon WO completion."
+                    : "T03 圓鼻銑刀壽命僅剩 12%，系統已自動排定於本工單完成後，引導 AGV-02 遞送新刀具至刀庫換刀位。"}
                 </span>
                 <button
                   type="button"
-                  onClick={() => sendQuick("檢查刀具磨損狀態")}
+                  onClick={() => sendQuick(langMode === "en" ? "check tool wear" : "檢查刀具磨損狀態")}
                   className="px-2 py-1 bg-amber-700 hover:bg-amber-800 text-white rounded text-[10px] font-bold whitespace-nowrap ml-2"
                 >
-                  語音回報刀況
+                  {langMode === "en" ? "Voice Tool Report" : "語音回報刀況"}
                 </button>
               </div>
             </div>
@@ -2061,12 +2171,18 @@ export default function Home() {
             <div className="p-3 bg-white rounded border border-slate-300 text-xs font-sans space-y-1">
               <div className="font-bold text-slate-800 flex items-center gap-1.5">
                 <i data-lucide="wrench" className="w-4 h-4 text-rose-600" />
-                機台專家系統診斷與即時排除建議：
+                {langMode === "en"
+                  ? "Expert System Machine Diagnostic & Triage Advice:"
+                  : "機台專家系統診斷與即時排除建議："}
               </div>
               <p className="text-slate-600 text-[11px] leading-relaxed">
                 {isAlarm
-                  ? "J2 軸伺服扭矩於 13:10:02 發生階躍型過載（峰值達 142% 額定扭矩），系統已觸發硬體煞車安全連鎖。AI 研判內部減速機或導軌異物卡阻，已完成原廠緊急報修，工單單號：#TICKET-8902。"
-                  : "各軸負載正常（J2 回到 36%），無過載警報。歷史工單：#TICKET-8902（已結案）。"}
+                  ? (langMode === "en"
+                      ? "J2 servo torque step-overloaded at 13:10:02 (peak 142% rated torque). Hardware brake interlock triggered. AI diagnosed mechanical jam in reducer/guide. Emergency ticket #TICKET-8902 dispatched to OEM."
+                      : "J2 軸伺服扭矩於 13:10:02 發生階躍型過載（峰值達 142% 額定扭矩），系統已觸發硬體煞車安全連鎖。AI 研判內部減速機或導軌異物卡阻，已完成原廠緊急報修，工單單號：#TICKET-8902。")
+                  : (langMode === "en"
+                      ? "All axis loads nominal (J2 returned to 36%). No overload alarms. Historical ticket: #TICKET-8902 (Closed)."
+                      : "各軸負載正常（J2 回到 36%），無過載警報。歷史工單：#TICKET-8902（已結案）。")}
               </p>
             </div>
           </div>
@@ -2076,7 +2192,9 @@ export default function Home() {
             <div className="flex justify-between items-center border-b border-[#9aa3b4] pb-2">
               <h2 className="text-base font-bold text-[#202731] flex items-center gap-2">
                 <i data-lucide="package" className="w-5 h-5 text-[#0056b3]" />
-                立體倉原料庫存監控與 AI 自動叫料
+                {langMode === "en"
+                  ? "Automated High-Bay Raw Material Inventory & AI Procurement"
+                  : "立體倉原料庫存監控與 AI 自動叫料"}
               </h2>
               <span className="text-xs font-mono text-slate-600">ERP / WMS LIVE</span>
             </div>
@@ -2084,10 +2202,12 @@ export default function Home() {
               <div className="lg:col-span-6 bg-slate-900 rounded-lg overflow-hidden border-2 border-slate-700 relative shadow-inner">
                 <div className="absolute top-2 left-3 z-10 flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping" />
-                  <span className="font-mono text-xs font-bold text-white bg-black/60 px-2 py-0.5 rounded">● CAM-02: 原料立體倉 03 貨架全景 [LIVE]</span>
+                  <span className="font-mono text-xs font-bold text-white bg-black/60 px-2 py-0.5 rounded">
+                    {langMode === "en" ? "● CAM-02: High-Bay 03 Overview [LIVE]" : "● CAM-02: 原料立體倉 03 貨架全景 [LIVE]"}
+                  </span>
                 </div>
                 <div className="absolute top-2 right-3 z-10 font-mono text-[11px] text-amber-400 bg-black/60 px-2 py-0.5 rounded">
-                  AI 物體辨識：低於安全庫存
+                  {langMode === "en" ? "AI Vision: Below Safety Stock" : "AI 物體辨識：低於安全庫存"}
                 </div>
                 <div className="h-60 w-full bg-gradient-to-b from-slate-950 via-slate-800 to-slate-900 flex flex-col justify-between p-4 relative cam-overlay">
                   <div className="mt-6 flex justify-between text-[11px] font-mono text-slate-300">
@@ -2096,7 +2216,9 @@ export default function Home() {
                   </div>
                   <div className="w-44 h-24 mx-auto border-2 border-dashed border-amber-400 bg-amber-500/10 rounded flex flex-col items-center justify-center text-center p-1">
                     <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-950/80 px-1 rounded">MAT-S45C-50</span>
-                    <span className="text-[10px] text-rose-400 font-bold mt-1">▲ 剩餘 35 支 (警戒線 50)</span>
+                    <span className="text-[10px] text-rose-400 font-bold mt-1">
+                      {langMode === "en" ? "▲ Remaining 35 pcs (Threshold: 50)" : "▲ 剩餘 35 支 (警戒線 50)"}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center text-[10px] font-mono text-slate-400">
                     <span>SENSOR: RFID / OPTICAL ON</span>
@@ -2108,15 +2230,17 @@ export default function Home() {
                 <table className="w-full text-xs text-left bg-white rounded border border-slate-300">
                   <thead className="bg-slate-100 border-b font-mono">
                     <tr>
-                      <th className="p-2">料號 / 品名</th>
-                      <th className="p-2">庫存</th>
-                      <th className="p-2">下限</th>
-                      <th className="p-2 text-right">操作</th>
+                      <th className="p-2">{langMode === "en" ? "Part # / Material" : "料號 / 品名"}</th>
+                      <th className="p-2">{langMode === "en" ? "Stock" : "庫存"}</th>
+                      <th className="p-2">{langMode === "en" ? "Min" : "下限"}</th>
+                      <th className="p-2 text-right">{langMode === "en" ? "Action" : "操作"}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y text-slate-700">
                     <tr className="bg-amber-50">
-                      <td className="p-2 font-bold font-mono">S45C 圓棒材 Ø50</td>
+                      <td className="p-2 font-bold font-mono">
+                        {langMode === "en" ? "S45C Round Bar Ø50" : "S45C 圓棒材 Ø50"}
+                      </td>
                       <td className="p-2 font-bold text-rose-700">
                         {langMode === "en" ? "35 pcs" : "35 支"}
                         {supplierCallStatus === "done" && (
@@ -2159,13 +2283,13 @@ export default function Home() {
                       </td>
                     </tr>
                     <tr>
-                      <td className="p-2 font-mono">AL6061 方棒 30x30</td>
+                      <td className="p-2 font-mono">{langMode === "en" ? "AL6061 Square Bar 30x30" : "AL6061 方棒 30x30"}</td>
                       <td className="p-2 font-bold text-emerald-700">{langMode === "en" ? "180 pcs" : "180 支"}</td>
                       <td className="p-2 font-mono">{langMode === "en" ? "60 pcs" : "60 支"}</td>
                       <td className="p-2 text-right text-slate-400">-</td>
                     </tr>
                     <tr>
-                      <td className="p-2 font-mono">SUS304 棒材 Ø20</td>
+                      <td className="p-2 font-mono">{langMode === "en" ? "SUS304 Round Bar Ø20" : "SUS304 棒材 Ø20"}</td>
                       <td className="p-2 font-bold text-emerald-700">{langMode === "en" ? "92 pcs" : "92 支"}</td>
                       <td className="p-2 font-mono">{langMode === "en" ? "40 pcs" : "40 支"}</td>
                       <td className="p-2 text-right text-slate-400">-</td>
@@ -2198,15 +2322,15 @@ export default function Home() {
                 <div key={call.id} className="p-3 bg-white rounded border space-y-2 shadow-sm">
                   <div className="flex justify-between font-mono">
                     <span className={`font-bold ${call.type === "repair" ? "text-rose-700" : "text-amber-800"}`}>
-                      ● {call.target} ({call.duration})
+                      ● {langMode === "en" ? (call.targetEn || call.target) : call.target} ({langMode === "en" ? (call.durationEn || call.duration) : call.duration})
                     </span>
                     <span className="text-slate-500">{call.time}</span>
                   </div>
                   <div className="p-2 bg-slate-50 border rounded text-[11px] leading-relaxed text-slate-700">
-                    <div>{call.aiSay}</div>
-                    <div className="mt-1 text-slate-800 font-medium">{call.respSay}</div>
+                    <div>{langMode === "en" ? (call.aiSayEn || call.aiSay) : call.aiSay}</div>
+                    <div className="mt-1 text-slate-800 font-medium">{langMode === "en" ? (call.respSayEn || call.respSay) : call.respSay}</div>
                   </div>
-                  <div className="text-[11px] text-emerald-700 font-bold">{call.po}</div>
+                  <div className="text-[11px] text-emerald-700 font-bold">{langMode === "en" ? (call.poEn || call.po) : call.po}</div>
                 </div>
               ))}
             </div>
@@ -2217,10 +2341,14 @@ export default function Home() {
             <div className="flex justify-between items-center border-b border-[#9aa3b4] pb-2">
               <h2 className="text-base font-bold text-[#202731] flex items-center gap-2">
                 <i data-lucide="scan-line" className="w-5 h-5 text-[#0056b3]" />
-                智能品檢與尺寸公差分析 · 三次元 CMM & AI 視覺掃描
+                {langMode === "en"
+                  ? "AI Smart Quality Inspection & Dimensional Tolerance · CMM & Vision Scan"
+                  : "智能品檢與尺寸公差分析 · 三次元 CMM & AI 視覺掃描"}
               </h2>
               <div className="flex items-center gap-2 text-xs font-mono">
-                <span className="text-slate-600">連動第 05 站「品檢入庫 AGV」</span>
+                <span className="text-slate-600">
+                  {langMode === "en" ? "Linked to Station 05: QC Storage AGV" : "連動第 05 站「品檢入庫 AGV」"}
+                </span>
                 <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">
                   ● CMM ONLINE
                 </span>
@@ -2230,24 +2358,29 @@ export default function Home() {
             {/* 頂部四指標卡 */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
               <div className="p-3 bg-white rounded border border-slate-300 shadow-sm">
-                <div className="text-slate-500 font-semibold">最新完工送檢</div>
+                <div className="text-slate-500 font-semibold">{langMode === "en" ? "Latest Inspected Part" : "最新完工送檢"}</div>
                 <div className="text-lg font-bold text-slate-800 mt-0.5">{heartbeat.inspectionPartId}</div>
-                <div className="text-[11px] text-slate-400 mt-1">工單 {heartbeat.workOrder}</div>
+                <div className="text-[11px] text-slate-400 mt-1">{langMode === "en" ? "WO " : "工單 "}{heartbeat.workOrder}</div>
               </div>
               <div className="p-3 bg-white rounded border border-slate-300 shadow-sm">
-                <div className="text-slate-500 font-semibold">表面粗糙度 (Ra)</div>
+                <div className="text-slate-500 font-semibold">{langMode === "en" ? "Surface Roughness (Ra)" : "表面粗糙度 (Ra)"}</div>
                 <div className="text-lg font-bold text-emerald-700 mt-0.5">{heartbeat.surfaceRoughnessRa} µm</div>
-                <div className="text-[11px] text-emerald-600 mt-1">基準 &lt;0.8 µm (合格)</div>
+                <div className="text-[11px] text-emerald-600 mt-1">{langMode === "en" ? "Std <0.8 µm (PASS)" : "基準 <0.8 µm (合格)"}</div>
               </div>
               <div className="p-3 bg-white rounded border border-slate-300 shadow-sm">
-                <div className="text-slate-500 font-semibold">輪廓/真圓度公差</div>
+                <div className="text-slate-500 font-semibold">{langMode === "en" ? "Profile / Roundness Tol" : "輪廓/真圓度公差"}</div>
                 <div className="text-lg font-bold text-emerald-700 mt-0.5">±{heartbeat.circularityTolerance} mm</div>
-                <div className="text-[11px] text-emerald-600 mt-1">公差 ±0.008 mm (合格)</div>
+                <div className="text-[11px] text-emerald-600 mt-1">{langMode === "en" ? "Tol ±0.008 mm (PASS)" : "公差 ±0.008 mm (合格)"}</div>
               </div>
               <div className="p-3 bg-white rounded border border-slate-300 shadow-sm">
-                <div className="text-slate-500 font-semibold">當班總檢驗良率</div>
+                <div className="text-slate-500 font-semibold">{langMode === "en" ? "Shift Inspection Yield" : "當班總檢驗良率"}</div>
                 <div className="text-lg font-bold text-blue-700 mt-0.5">{heartbeat.shiftYieldRate}%</div>
-                <div className="text-[11px] text-slate-500 mt-1">合格 {heartbeat.shiftPartsPassed} / 總量 {heartbeat.shiftPartsInspected}</div>
+                <div className="text-[11px] text-slate-500 mt-1">
+                  {langMode === "en" ? "Pass " : "合格 "}
+                  {heartbeat.shiftPartsPassed}
+                  {langMode === "en" ? " / Total " : " / 總量 "}
+                  {heartbeat.shiftPartsInspected}
+                </div>
               </div>
             </div>
 
@@ -2258,53 +2391,55 @@ export default function Home() {
                 <div className="flex justify-between items-center border-b border-slate-200 pb-2">
                   <span className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
                     <i data-lucide="crosshair" className="w-4 h-4 text-blue-600" />
-                    三次元 (CMM) 關鍵幾何尺寸精度報告
+                    {langMode === "en" ? "CMM Critical Geometric Tolerance Report" : "三次元 (CMM) 關鍵幾何尺寸精度報告"}
                   </span>
-                  <span className="text-[11px] font-mono text-slate-400">ZEISS ACCURA 聯網</span>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    {langMode === "en" ? "ZEISS ACCURA ONLINE" : "ZEISS ACCURA 聯網"}
+                  </span>
                 </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs font-mono border-collapse">
                     <thead>
                       <tr className="bg-slate-100 text-slate-700 text-left border-b border-slate-300">
-                        <th className="p-2">量測特徵項目</th>
-                        <th className="p-2">工程標稱</th>
-                        <th className="p-2">實測值</th>
-                        <th className="p-2">公差偏差</th>
-                        <th className="p-2 text-center">判定</th>
+                        <th className="p-2">{langMode === "en" ? "Measured Feature" : "量測特徵項目"}</th>
+                        <th className="p-2">{langMode === "en" ? "Nominal" : "工程標稱"}</th>
+                        <th className="p-2">{langMode === "en" ? "Actual" : "實測值"}</th>
+                        <th className="p-2">{langMode === "en" ? "Deviation" : "公差偏差"}</th>
+                        <th className="p-2 text-center">{langMode === "en" ? "Status" : "判定"}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
                       <tr>
-                        <td className="p-2 font-bold text-slate-800">葉根榫頭厚度 (Base T)</td>
+                        <td className="p-2 font-bold text-slate-800">{langMode === "en" ? "Base Tenon Thickness (Base T)" : "葉根榫頭厚度 (Base T)"}</td>
                         <td className="p-2 text-slate-600">18.500 mm</td>
                         <td className="p-2 font-bold text-slate-900">18.498 mm</td>
                         <td className="p-2 text-emerald-700 font-semibold">-0.002 mm</td>
                         <td className="p-2 text-center"><span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">PASS</span></td>
                       </tr>
                       <tr>
-                        <td className="p-2 font-bold text-slate-800">葉根安裝銷孔 (Pin Hole)</td>
+                        <td className="p-2 font-bold text-slate-800">{langMode === "en" ? "Pin Hole Diameter (Pin Hole)" : "葉根安裝銷孔 (Pin Hole)"}</td>
                         <td className="p-2 text-slate-600">Ø8.000 mm</td>
                         <td className="p-2 font-bold text-slate-900">Ø8.001 mm</td>
                         <td className="p-2 text-emerald-700 font-semibold">+0.001 mm</td>
                         <td className="p-2 text-center"><span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">PASS</span></td>
                       </tr>
                       <tr>
-                        <td className="p-2 font-bold text-slate-800">前緣流線型面輪廓度</td>
+                        <td className="p-2 font-bold text-slate-800">{langMode === "en" ? "Leading Edge Profile Tolerance" : "前緣流線型面輪廓度"}</td>
                         <td className="p-2 text-slate-600">0.000 mm</td>
                         <td className="p-2 font-bold text-slate-900">0.002 mm</td>
                         <td className="p-2 text-emerald-700 font-semibold">+0.002 mm</td>
                         <td className="p-2 text-center"><span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">PASS</span></td>
                       </tr>
                       <tr>
-                        <td className="p-2 font-bold text-slate-800">尾緣厚度 (Trailing Edge)</td>
+                        <td className="p-2 font-bold text-slate-800">{langMode === "en" ? "Trailing Edge Thickness" : "尾緣厚度 (Trailing Edge)"}</td>
                         <td className="p-2 text-slate-600">1.200 mm</td>
                         <td className="p-2 font-bold text-slate-900">1.203 mm</td>
                         <td className="p-2 text-emerald-700 font-semibold">+0.003 mm</td>
                         <td className="p-2 text-center"><span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">PASS</span></td>
                       </tr>
                       <tr>
-                        <td className="p-2 font-bold text-slate-800">表面粗糙度 (Ra)</td>
+                        <td className="p-2 font-bold text-slate-800">{langMode === "en" ? "Surface Roughness (Ra)" : "表面粗糙度 (Ra)"}</td>
                         <td className="p-2 text-slate-600">&lt; 0.80 µm</td>
                         <td className="p-2 font-bold text-slate-900">0.38 µm</td>
                         <td className="p-2 text-emerald-700 font-semibold">-0.42 µm</td>
@@ -2315,7 +2450,15 @@ export default function Home() {
                 </div>
 
                 <div className="p-2.5 bg-blue-50 border border-blue-200 rounded text-xs text-blue-900 font-mono">
-                  💡 <strong>CMM 智能閉環反饋：</strong>平均幾何尺寸精度在 ±0.002mm 以內，無需進行 CNC 刀長刀徑磨耗補償 (Tool Wear Offset: 0.000mm)。
+                  {langMode === "en" ? (
+                    <>
+                      💡 <strong>CMM Closed-Loop Feedback:</strong> Avg geometric tolerance within ±0.002mm. CNC tool wear offset compensation not required (Tool Wear Offset: 0.000mm).
+                    </>
+                  ) : (
+                    <>
+                      💡 <strong>CMM 智能閉環反饋：</strong>平均幾何尺寸精度在 ±0.002mm 以內，無需進行 CNC 刀長刀徑磨耗補償 (Tool Wear Offset: 0.000mm)。
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -2325,39 +2468,45 @@ export default function Home() {
                   <div className="flex justify-between items-center border-b border-slate-200 pb-2 mb-3">
                     <span className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
                       <i data-lucide="eye" className="w-4 h-4 text-purple-600" />
-                      AI 機器視覺表面瑕疵掃描 (Visual AI Defect)
+                      {langMode === "en" ? "AI Vision Optical Surface Defect Scan (Visual AI Defect)" : "AI 機器視覺表面瑕疵掃描 (Visual AI Defect)"}
                     </span>
-                    <span className="text-[11px] font-mono text-purple-700 font-bold">100% 表面檢測</span>
+                    <span className="text-[11px] font-mono text-purple-700 font-bold">
+                      {langMode === "en" ? "100% Surface Coverage" : "100% 表面檢測"}
+                    </span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs font-mono mb-3">
                     <div className="p-2.5 bg-slate-50 border rounded flex justify-between items-center">
-                      <span className="text-slate-600">邊緣毛刺檢測 (Burrs)</span>
-                      <span className="font-bold text-emerald-700">0 處 (合格)</span>
+                      <span className="text-slate-600">{langMode === "en" ? "Burrs Detection" : "邊緣毛刺檢測 (Burrs)"}</span>
+                      <span className="font-bold text-emerald-700">{langMode === "en" ? "0 found (PASS)" : "0 處 (合格)"}</span>
                     </div>
                     <div className="p-2.5 bg-slate-50 border rounded flex justify-between items-center">
-                      <span className="text-slate-600">微裂痕/暗紋 (Cracks)</span>
-                      <span className="font-bold text-emerald-700">0 處 (合格)</span>
+                      <span className="text-slate-600">{langMode === "en" ? "Micro-Cracks" : "微裂痕/暗紋 (Cracks)"}</span>
+                      <span className="font-bold text-emerald-700">{langMode === "en" ? "0 found (PASS)" : "0 處 (合格)"}</span>
                     </div>
                     <div className="p-2.5 bg-slate-50 border rounded flex justify-between items-center">
-                      <span className="text-slate-600">刮痕/碰傷 (Scratches)</span>
-                      <span className="font-bold text-emerald-700">0 處 (合格)</span>
+                      <span className="text-slate-600">{langMode === "en" ? "Scratches / Dents" : "刮痕/碰傷 (Scratches)"}</span>
+                      <span className="font-bold text-emerald-700">{langMode === "en" ? "0 found (PASS)" : "0 處 (合格)"}</span>
                     </div>
                     <div className="p-2.5 bg-slate-50 border rounded flex justify-between items-center">
-                      <span className="text-slate-600">切削熱變色 (Discolor)</span>
-                      <span className="font-bold text-emerald-700">無變色 (合格)</span>
+                      <span className="text-slate-600">{langMode === "en" ? "Heat Discoloration" : "切削熱變色 (Discolor)"}</span>
+                      <span className="font-bold text-emerald-700">{langMode === "en" ? "None (PASS)" : "無變色 (合格)"}</span>
                     </div>
                   </div>
 
                   {/* 檢驗判定大印章 */}
                   <div className="p-4 rounded-lg bg-emerald-50 border-2 border-dashed border-emerald-500 flex items-center justify-between">
                     <div className="space-y-1">
-                      <div className="text-xs text-emerald-900 font-mono font-bold">自動雷射序號打標</div>
+                      <div className="text-xs text-emerald-900 font-mono font-bold">
+                        {langMode === "en" ? "Auto Laser Serial Marking" : "自動雷射序號打標"}
+                      </div>
                       <div className="text-sm font-mono font-black text-emerald-800">
                         SN: 2026-A109-0348-PASS
                       </div>
                       <div className="text-[11px] text-emerald-700">
-                        已連線 MES 系統歸檔，AGV-04 自動接駁運往恆溫品管立體倉庫。
+                        {langMode === "en"
+                          ? "Synced with MES. AGV-04 automatically dispatching to climate-controlled warehouse."
+                          : "已連線 MES 系統歸檔，AGV-04 自動接駁運往恆溫品管立體倉庫。"}
                       </div>
                     </div>
                     <div className="px-4 py-2 bg-emerald-600 text-white rounded font-black text-xl font-mono tracking-wider shadow-md transform -rotate-3 border border-emerald-400">
@@ -2367,7 +2516,9 @@ export default function Home() {
                 </div>
 
                 <div className="text-[11px] text-slate-500 font-mono text-right">
-                  檢驗時間戳記: {heartbeat.lastInspectionTime} · 檢驗員: Model宇宙 AI 視覺代理
+                  {langMode === "en" ? "Inspection Timestamp: " : "檢驗時間戳記: "}
+                  {heartbeat.lastInspectionTime}
+                  {langMode === "en" ? " · Inspector: MODEL UNIVERSE AI Vision Agent" : " · 檢驗員: Model宇宙 AI 視覺代理"}
                 </div>
               </div>
             </div>
@@ -2378,10 +2529,14 @@ export default function Home() {
             <div className="flex justify-between items-center border-b border-[#9aa3b4] pb-2">
               <h2 className="text-base font-bold text-[#202731] flex items-center gap-2">
                 <i data-lucide="leaf" className="w-5 h-5 text-emerald-600" />
-                綠色能源管理 · ESG 碳排計算與設備預測性維護
+                {langMode === "en"
+                  ? "Green Energy & ESG Carbon Tracking · Predictive Maintenance"
+                  : "綠色能源管理 · ESG 碳排計算與設備預測性維護"}
               </h2>
               <div className="flex items-center gap-2 text-xs font-mono">
-                <span className="text-slate-600">廠務物聯網遙測</span>
+                <span className="text-slate-600">
+                  {langMode === "en" ? "Facility IoT Telemetry" : "廠務物聯網遙測"}
+                </span>
                 <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">
                   ● ISO 50001 & ISO 14064
                 </span>
@@ -2393,34 +2548,42 @@ export default function Home() {
               <div className="p-3 bg-white rounded border border-slate-300 shadow-sm">
                 <div className="text-slate-500 font-semibold flex items-center gap-1">
                   <i data-lucide="zap" className="w-3.5 h-3.5 text-amber-500" />
-                  全機即時總功率
+                  {langMode === "en" ? "Total Real-Time Power" : "全機即時總功率"}
                 </div>
                 <div className="text-xl font-bold text-slate-900 mt-0.5">{heartbeat.realtimePowerKW} kW</div>
-                <div className="text-[11px] text-slate-400 mt-1">主軸 18.2kW · 伺服 4.8kW</div>
+                <div className="text-[11px] text-slate-400 mt-1">
+                  {langMode === "en" ? "Spindle 18.2kW · Servo 4.8kW" : "主軸 18.2kW · 伺服 4.8kW"}
+                </div>
               </div>
               <div className="p-3 bg-white rounded border border-slate-300 shadow-sm">
                 <div className="text-slate-500 font-semibold flex items-center gap-1">
                   <i data-lucide="activity" className="w-3.5 h-3.5 text-blue-500" />
-                  當班累計耗電
+                  {langMode === "en" ? "Shift Cumulative Energy" : "當班累計耗電"}
                 </div>
                 <div className="text-xl font-bold text-blue-700 mt-0.5">{heartbeat.cumulativeKWh} kWh</div>
-                <div className="text-[11px] text-blue-600 mt-1">每秒即時跳錶計算</div>
+                <div className="text-[11px] text-blue-600 mt-1">
+                  {langMode === "en" ? "Real-Time Sub-Metering" : "每秒即時跳錶計算"}
+                </div>
               </div>
               <div className="p-3 bg-white rounded border border-slate-300 shadow-sm">
                 <div className="text-slate-500 font-semibold flex items-center gap-1">
                   <i data-lucide="dollar-sign" className="w-3.5 h-3.5 text-emerald-600" />
-                  當班電費折算
+                  {langMode === "en" ? "Shift Electricity Cost" : "當班電費折算"}
                 </div>
                 <div className="text-xl font-bold text-emerald-700 mt-0.5">{heartbeat.electricityCostNTD} NTD</div>
-                <div className="text-[11px] text-slate-500 mt-1">約 ${heartbeat.electricityCostUSD} USD</div>
+                <div className="text-[11px] text-slate-500 mt-1">
+                  {langMode === "en" ? "Approx $" : "約 $"}{heartbeat.electricityCostUSD} USD
+                </div>
               </div>
               <div className="p-3 bg-white rounded border border-slate-300 shadow-sm">
                 <div className="text-slate-500 font-semibold flex items-center gap-1">
                   <i data-lucide="globe" className="w-3.5 h-3.5 text-teal-600" />
-                  ESG 累計碳排放
+                  {langMode === "en" ? "ESG Cumulative Carbon" : "ESG 累計碳排放"}
                 </div>
                 <div className="text-xl font-bold text-teal-700 mt-0.5">{heartbeat.carbonKgCO2e} kg CO₂e</div>
-                <div className="text-[11px] text-teal-600 mt-1">單件 0.26 kg CO₂e / 件</div>
+                <div className="text-[11px] text-teal-600 mt-1">
+                  {langMode === "en" ? "0.26 kg CO₂e / part" : "單件 0.26 kg CO2e / 件"}
+                </div>
               </div>
             </div>
 
@@ -2431,15 +2594,17 @@ export default function Home() {
                 <div className="flex justify-between items-center border-b border-slate-200 pb-2">
                   <span className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
                     <i data-lucide="pie-chart" className="w-4 h-4 text-emerald-600" />
-                    全機能耗細部負載結構分析
+                    {langMode === "en" ? "Detailed Machine Load Breakdown" : "全機能耗細部負載結構分析"}
                   </span>
-                  <span className="text-[11px] font-mono text-emerald-700 font-bold">屋頂太陽能: {heartbeat.solarSelfSufficiency}%</span>
+                  <span className="text-[11px] font-mono text-emerald-700 font-bold">
+                    {langMode === "en" ? "Rooftop Solar: " : "屋頂太陽能: "}{heartbeat.solarSelfSufficiency}%
+                  </span>
                 </div>
 
                 <div className="space-y-2 text-xs font-mono">
                   <div>
                     <div className="flex justify-between text-slate-700 mb-1">
-                      <span>主軸馬達旋轉驅動 (Spindle Motor)</span>
+                      <span>{langMode === "en" ? "Spindle Motor Drive" : "主軸馬達旋轉驅動 (Spindle Motor)"}</span>
                       <span className="font-bold">{heartbeat.spindlePowerKW} kW (64.1%)</span>
                     </div>
                     <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
@@ -2449,7 +2614,7 @@ export default function Home() {
 
                   <div>
                     <div className="flex justify-between text-slate-700 mb-1">
-                      <span>五軸伺服進給系統 (5-Axis Servo Drives)</span>
+                      <span>{langMode === "en" ? "5-Axis Servo Feed Drives" : "五軸伺服進給系統 (5-Axis Servo Drives)"}</span>
                       <span className="font-bold">{heartbeat.servoPowerKW} kW (16.9%)</span>
                     </div>
                     <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
@@ -2459,7 +2624,7 @@ export default function Home() {
 
                   <div>
                     <div className="flex justify-between text-slate-700 mb-1">
-                      <span>高壓冷卻泵與排屑機 (High-Pressure Pump)</span>
+                      <span>{langMode === "en" ? "High-Pressure Coolant & Chip Conveyor" : "高壓冷卻泵與排屑機 (High-Pressure Pump)"}</span>
                       <span className="font-bold">{heartbeat.pumpPowerKW} kW (12.3%)</span>
                     </div>
                     <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
@@ -2469,7 +2634,7 @@ export default function Home() {
 
                   <div>
                     <div className="flex justify-between text-slate-700 mb-1">
-                      <span>工控機電、冷氣與輔助周邊 (Aux & Controls)</span>
+                      <span>{langMode === "en" ? "CNC Cabinet, Chiller & Auxiliaries" : "工控機電、冷氣與輔助周邊 (Aux & Controls)"}</span>
                       <span className="font-bold">{heartbeat.auxPowerKW} kW (6.7%)</span>
                     </div>
                     <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
@@ -2479,9 +2644,19 @@ export default function Home() {
                 </div>
 
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded text-xs text-emerald-900 font-mono space-y-1">
-                  <div className="font-bold">🌱 綠色永續智造指標 (ESG Sustainability)</div>
+                  <div className="font-bold">
+                    {langMode === "en" ? "🌱 Green Sustainable Manufacturing Metrics (ESG)" : "🌱 綠色永續智造指標 (ESG Sustainability)"}
+                  </div>
                   <div className="text-[11px] leading-relaxed text-emerald-800">
-                    屋頂 250kW 太陽能光電自給率 <strong>{heartbeat.solarSelfSufficiency}%</strong>，當班減少碳排 33.6 kg CO₂e。符合歐盟 CBAM 碳邊境機制與 2026 工具機節能標章。
+                    {langMode === "en" ? (
+                      <>
+                        Rooftop 250kW solar self-sufficiency at <strong>{heartbeat.solarSelfSufficiency}%</strong>, reducing 33.6 kg CO₂e this shift. Fully compliant with EU CBAM & 2026 Machine Tool Energy Standards.
+                      </>
+                    ) : (
+                      <>
+                        屋頂 250kW 太陽能光電自給率 <strong>{heartbeat.solarSelfSufficiency}%</strong>，當班減少碳排 33.6 kg CO₂e。符合歐盟 CBAM 碳邊境機制與 2026 工具機節能標章。
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2491,63 +2666,101 @@ export default function Home() {
                 <div className="flex justify-between items-center border-b border-slate-200 pb-2">
                   <span className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
                     <i data-lucide="shield-check" className="w-4 h-4 text-blue-600" />
-                    預測性維護健康矩陣 (Predictive Health Matrix)
+                    {langMode === "en" ? "Predictive Health Matrix" : "預測性維護健康矩陣 (Predictive Health Matrix)"}
                   </span>
-                  <span className="text-[11px] font-mono text-slate-400">AI 震動頻譜 & 壽命預警</span>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    {langMode === "en" ? "AI Vibration Spectrum & Prognostics" : "AI 震動頻譜 & 壽命預警"}
+                  </span>
                 </div>
 
                 <div className="space-y-3 text-xs font-mono">
                   {/* 主軸軸承震動頻譜 */}
                   <div className="p-2.5 bg-slate-50 border rounded space-y-1.5">
                     <div className="flex justify-between items-center">
-                      <span className="font-bold text-slate-800">主軸後軸承震動健康度</span>
-                      <span className="font-bold text-emerald-700">{heartbeat.spindleVibrationHealth}% (良好)</span>
+                      <span className="font-bold text-slate-800">
+                        {langMode === "en" ? "Spindle Rear Bearing Vibration Health" : "主軸後軸承震動健康度"}
+                      </span>
+                      <span className="font-bold text-emerald-700">
+                        {heartbeat.spindleVibrationHealth}% {langMode === "en" ? "(Good)" : "(良好)"}
+                      </span>
                     </div>
                     <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
                       <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${heartbeat.spindleVibrationHealth}%` }} />
                     </div>
                     <div className="text-[11px] text-slate-500">
-                      ISO 10816 震動速度均方根值: <strong>0.82 mm/s</strong> (綠色優良區間 &lt;1.8 mm/s)。
+                      {langMode === "en" ? (
+                        <>
+                          ISO 10816 RMS vibration: <strong>0.82 mm/s</strong> (Normal zone &lt;1.8 mm/s).
+                        </>
+                      ) : (
+                        <>
+                          ISO 10816 震動速度均方根值: <strong>0.82 mm/s</strong> (綠色優良區間 &lt;1.8 mm/s)。
+                        </>
+                      )}
                     </div>
                   </div>
 
                   {/* 滾珠螺桿自動潤滑油槽 */}
                   <div className="p-2.5 bg-slate-50 border rounded space-y-1.5">
                     <div className="flex justify-between items-center">
-                      <span className="font-bold text-slate-800">滾珠螺桿自動潤滑油槽</span>
-                      <span className="font-bold text-blue-700">{heartbeat.lubricationOilLevel}% (剩餘 2.1L)</span>
+                      <span className="font-bold text-slate-800">
+                        {langMode === "en" ? "Ball Screw Auto Lubrication Reservoir" : "滾珠螺桿自動潤滑油槽"}
+                      </span>
+                      <span className="font-bold text-blue-700">
+                        {heartbeat.lubricationOilLevel}% {langMode === "en" ? "(2.1L Left)" : "(剩餘 2.1L)"}
+                      </span>
                     </div>
                     <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
                       <div className="h-full bg-blue-500 rounded-full" style={{ width: `${heartbeat.lubricationOilLevel}%` }} />
                     </div>
                     <div className="text-[11px] text-slate-500">
-                      預估可連續運轉 <strong>48 小時</strong>，建議後天早班前例行補充 Mobil Vactra No.2 導軌油。
+                      {langMode === "en" ? (
+                        <>
+                          Est. continuous run: <strong>48 hrs</strong>. Scheduled top-up with Mobil Vactra No.2 recommended.
+                        </>
+                      ) : (
+                        <>
+                          預估可連續運轉 <strong>48 小時</strong>，建議後天早班前例行補充 Mobil Vactra No.2 導軌油。
+                        </>
+                      )}
                     </div>
                   </div>
 
                   {/* 切削水箱冷卻液濃度 */}
                   <div className="p-2.5 bg-slate-50 border rounded space-y-1.5">
                     <div className="flex justify-between items-center">
-                      <span className="font-bold text-slate-800">切削水箱冷卻液折光濃度</span>
-                      <span className="font-bold text-amber-700">{heartbeat.coolantBrix}% Brix (微偏低)</span>
+                      <span className="font-bold text-slate-800">
+                        {langMode === "en" ? "Coolant Tank Refractometer Concentration" : "切削水箱冷卻液折光濃度"}
+                      </span>
+                      <span className="font-bold text-amber-700">
+                        {heartbeat.coolantBrix}% Brix {langMode === "en" ? "(Slightly Low)" : "(微偏低)"}
+                      </span>
                     </div>
                     <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
                       <div className="h-full bg-amber-500 rounded-full" style={{ width: "70%" }} />
                     </div>
                     <div className="text-[11px] text-amber-800 font-semibold">
-                      標準基準 9.0% - 11.0%，目前 8.5%，建議下班前補充 5 公升水性抗磨切削油精。
+                      {langMode === "en"
+                        ? "Std spec: 9.0% - 11.0%, currently 8.5%. Recommend adding 5L water-soluble coolant concentrate."
+                        : "標準基準 9.0% - 11.0%，目前 8.5%，建議下班前補充 5 公升水性抗磨切削油精。"}
                     </div>
                   </div>
 
                   {/* 廠房空壓 */}
                   <div className="p-2.5 bg-slate-50 border rounded flex justify-between items-center">
                     <div>
-                      <div className="font-bold text-slate-800">廠房空壓總源壓力</div>
-                      <div className="text-[11px] text-slate-500">五軸換刀與打刀缸驅動氣源</div>
+                      <div className="font-bold text-slate-800">
+                        {langMode === "en" ? "Main Shop Pneumatic Air Pressure" : "廠房空壓總源壓力"}
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        {langMode === "en" ? "Supply for ATC Tool Changer & Unclamp Cylinder" : "五軸換刀與打刀缸驅動氣源"}
+                      </div>
                     </div>
                     <div className="text-right">
                       <div className="font-bold text-emerald-700 text-sm">{heartbeat.airPressureMpa} MPa</div>
-                      <div className="text-[10px] text-emerald-600">正常標準 (0.60-0.70)</div>
+                      <div className="text-[10px] text-emerald-600">
+                        {langMode === "en" ? "Normal Range (0.60-0.70)" : "正常標準 (0.60-0.70)"}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2699,7 +2912,15 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => setLiveModeWanted((prev) => !prev)}
-                  title={liveModeWanted ? "目前為 AssemblyAI 真人模式，點擊切換為 Mock 模擬模式" : "目前為 Mock 模擬模式，點擊切換為 AssemblyAI 真人模式"}
+                  title={
+                    langMode === "en"
+                      ? liveModeWanted
+                        ? "Currently Live AssemblyAI mode. Click to switch to Mock"
+                        : "Currently Mock mode. Click to switch to Live AssemblyAI"
+                      : liveModeWanted
+                        ? "目前為 AssemblyAI 真人模式，點擊切換為 Mock 模擬模式"
+                        : "目前為 Mock 模擬模式，點擊切換為 AssemblyAI 真人模式"
+                  }
                   className={`text-[10px] font-mono px-1.5 py-0.5 rounded border font-semibold ${
                     liveModeWanted
                       ? "bg-purple-100 text-purple-800 border-purple-300"
@@ -2711,7 +2932,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => setShowConfig((prev) => !prev)}
-                  title="連線設定"
+                  title={langMode === "en" ? "Connection Settings" : "連線設定"}
                   className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-slate-300 hover:bg-slate-100 text-slate-700"
                 >
                   ⚙
@@ -2719,7 +2940,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => setVoiceOn((v) => !v)}
-                  title="開關宇宙的語音回覆"
+                  title={langMode === "en" ? "Toggle Voice Audio Feedback" : "開關宇宙的語音回覆"}
                   className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-slate-300 hover:bg-slate-100"
                 >
                   {voiceOn ? "🔊" : "🔇"}
@@ -2727,7 +2948,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={closeDialog}
-                  title="收回對話框"
+                  title={langMode === "en" ? "Close Dialog" : "收回對話框"}
                   className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-slate-300 hover:bg-slate-100 text-slate-700"
                 >
                   ✕
@@ -2739,7 +2960,9 @@ export default function Home() {
             {showConfig && (
               <div className="p-2 bg-slate-50 border border-slate-200 rounded text-[11px] flex flex-col gap-1.5">
                 <div className="flex justify-between items-center">
-                  <span className="font-semibold text-slate-700">語音後端模式：</span>
+                  <span className="font-semibold text-slate-700">
+                    {langMode === "en" ? "Voice Backend Mode:" : "語音後端模式："}
+                  </span>
                   <span className="font-mono text-[10px] text-slate-500">
                     {liveModeWanted ? "AssemblyAI Voice Agent API" : "Local Mock (ws://localhost:8787)"}
                   </span>
@@ -2754,7 +2977,7 @@ export default function Home() {
                       type="password"
                       value={passcode}
                       onChange={(e) => setPasscode(e.target.value)}
-                      placeholder="預設 414"
+                      placeholder={langMode === "en" ? "Default: 414" : "預設 414"}
                       className="flex-1 px-1.5 py-0.5 rounded border border-slate-300 font-mono text-xs"
                     />
                   </div>
@@ -2776,14 +2999,14 @@ export default function Home() {
                 />
                 <span className="text-slate-600 font-semibold">
                   {bridge.status === "listening"
-                    ? `語音連線中 (${bridge.seconds}s)`
+                    ? (langMode === "en" ? `Voice Connected (${bridge.seconds}s)` : `語音連線中 (${bridge.seconds}s)`)
                     : bridge.status === "speaking"
-                      ? `語音回話中 (${bridge.seconds}s)`
+                      ? (langMode === "en" ? `AI Speaking (${bridge.seconds}s)` : `語音回話中 (${bridge.seconds}s)`)
                       : bridge.status === "thinking"
-                        ? "AI 決策執行中..."
+                        ? (langMode === "en" ? "AI Executing Action..." : "AI 決策執行中...")
                         : bridge.status === "connecting"
-                          ? "連線建立中..."
-                          : "語音助理待命中"}
+                          ? (langMode === "en" ? "Connecting..." : "連線建立中...")
+                          : (langMode === "en" ? "Voice Assistant Standby" : "語音助理待命中")}
                 </span>
               </div>
               <div>
@@ -2793,7 +3016,7 @@ export default function Home() {
                     onClick={() => void toggleVoiceSession()}
                     className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px]"
                   >
-                    ▶ 連線對話
+                    {langMode === "en" ? "▶ Connect Voice" : "▶ 連線對話"}
                   </button>
                 ) : (
                   <button
@@ -2801,7 +3024,7 @@ export default function Home() {
                     onClick={() => bridge.endCall()}
                     className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px]"
                   >
-                    ⏹ 掛斷
+                    {langMode === "en" ? "⏹ End Call" : "⏹ 掛斷"}
                   </button>
                 )}
               </div>
@@ -2811,18 +3034,18 @@ export default function Home() {
             <div className="w-full p-2.5 bg-slate-50/90 rounded border border-slate-300 text-[11px] font-sans text-slate-800 leading-snug min-h-[60px] flex flex-col gap-1.5 max-h-[160px] overflow-y-auto">
               {bridge.lastUserSay && (
                 <div className="text-blue-900 bg-blue-50/80 p-1.5 rounded border border-blue-200">
-                  <span className="font-bold">👤 操作員：</span>
+                  <span className="font-bold">{langMode === "en" ? "👤 Operator: " : "👤 操作員："}</span>
                   {bridge.lastUserSay}
                 </div>
               )}
               {mvReply ? (
                 <div className="text-slate-900 bg-emerald-50/60 p-1.5 rounded border border-emerald-200">
-                  <span className="font-bold text-emerald-800">🤖 MODEL宇宙：</span>
+                  <span className="font-bold text-emerald-800">{langMode === "en" ? "🤖 MODEL UNIVERSE: " : "🤖 MODEL宇宙："}</span>
                   {mvReply}
                 </div>
               ) : bridge.lastAgentSay ? (
                 <div className="text-slate-900 bg-emerald-50/60 p-1.5 rounded border border-emerald-200">
-                  <span className="font-bold text-emerald-800">🤖 MODEL宇宙：</span>
+                  <span className="font-bold text-emerald-800">{langMode === "en" ? "🤖 MODEL UNIVERSE: " : "🤖 MODEL宇宙："}</span>
                   {bridge.lastAgentSay}
                 </div>
               ) : null}
@@ -2891,8 +3114,16 @@ export default function Home() {
           onTouchMove={(e) => orbMove(e.touches[0].clientX, e.touches[0].clientY)}
           onTouchEnd={orbRelease}
           aria-pressed={bridge.status === "listening" || mvListening}
-          aria-label="Model宇宙語音球：直接喊「宇宙」或點擊對話，拖曳移動"
-          title="直接喊「宇宙」或點擊對話，拖曳移動"
+          aria-label={
+            langMode === "en"
+              ? "MODEL Universe Voice Orb: Say 'Universe' or click to speak, drag to reposition"
+              : "Model宇宙語音球：直接喊「宇宙」或點擊對話，拖曳移動"
+          }
+          title={
+            langMode === "en"
+              ? "Say 'Universe' or click to speak, drag to reposition"
+              : "直接喊「宇宙」或點擊對話，拖曳移動"
+          }
           className={`mv-orb w-24 h-24 flex items-center justify-center cursor-pointer transition-transform active:scale-95 ${
             bridge.status === "listening" || mvListening ? "listening " : ""
           }${bridge.status === "speaking" ? "speaking " : ""}${
