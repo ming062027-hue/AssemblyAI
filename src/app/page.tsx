@@ -978,7 +978,7 @@ export default function Home() {
               <span>•</span>
               <span>{langMode === "en" ? "VIEW: " : "視圖: "}{langMode === "en" ? TAB_NAMES_EN[view] : TAB_NAMES[view]}</span>
               <span>•</span>
-              <span className="text-slate-300">{langMode === "en" ? "WO: " : "工單: "}{heartbeat.workOrder} ({heartbeat.partName})</span>
+              <span className="text-slate-300">{langMode === "en" ? "WO: " : "工單: "}{heartbeat.workOrder} ({langMode === "en" ? (heartbeat.partNameEn || heartbeat.partName) : heartbeat.partName})</span>
             </div>
           </div>
         </div>

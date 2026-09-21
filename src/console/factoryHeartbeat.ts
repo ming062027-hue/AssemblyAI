@@ -26,12 +26,15 @@ export interface WorkOrderConfig {
   id: "A109" | "B202" | "C303";
   code: string;
   partName: string;
+  partNameEn?: string;
   material: string;
+  materialEn?: string;
   targetPcs: number;
   initialCompleted: number;
   cycleTotalSec: number;
   spindleTargetRpm: number;
   primaryTool: string;
+  primaryToolEn?: string;
   gcodeList: GCodeBlock[];
 }
 
@@ -75,36 +78,45 @@ export const WORK_ORDERS: Record<"A109" | "B202" | "C303", WorkOrderConfig> = {
     id: "A109",
     code: "#WO-2026-A109",
     partName: "航太五軸 鈦合金渦輪葉片 (Ti-6Al-4V)",
+    partNameEn: "5-Axis Aerospace Titanium Turbine Blade (Ti-6Al-4V)",
     material: "Ti-6Al-4V 航太鈦合金",
+    materialEn: "Ti-6Al-4V Aerospace Titanium",
     targetPcs: 500,
     initialCompleted: 348,
     cycleTotalSec: 270, // 4分30秒
     spindleTargetRpm: 8500,
     primaryTool: "T03 精銑球刀 R4",
+    primaryToolEn: "T03 Ball Endmill R4",
     gcodeList: GCODE_STREAM_A109,
   },
   B202: {
     id: "B202",
     code: "#WO-2026-B202",
     partName: "航太高壓燃油閥體 (AL7075-T6)",
+    partNameEn: "Aerospace High-Pressure Fuel Valve (AL7075-T6)",
     material: "AL7075-T6 航太鋁合金",
+    materialEn: "AL7075-T6 Aerospace Aluminum",
     targetPcs: 600,
     initialCompleted: 412,
     cycleTotalSec: 195, // 3分15秒
     spindleTargetRpm: 12000,
     primaryTool: "T02 粗銑刀 Ø16",
+    primaryToolEn: "T02 Rough Endmill Ø16",
     gcodeList: GCODE_STREAM_B202,
   },
   C303: {
     id: "C303",
     code: "#WO-2026-C303",
     partName: "醫療級人工髖關節球體 (SUS316L)",
+    partNameEn: "Medical Grade Artificial Hip Joint (SUS316L)",
     material: "SUS316L 醫療植入級不鏽鋼",
+    materialEn: "SUS316L Medical Implant Stainless Steel",
     targetPcs: 300,
     initialCompleted: 186,
     cycleTotalSec: 340, // 5分40秒
     spindleTargetRpm: 6800,
     primaryTool: "T01 面銑刀 Ø50",
+    primaryToolEn: "T01 Face Mill Ø50",
     gcodeList: GCODE_STREAM_C303,
   },
 };
@@ -134,11 +146,14 @@ export interface FactoryHeartbeatState {
   workOrderId: "A109" | "B202" | "C303";
   workOrder: string;
   partName: string;
+  partNameEn?: string;
   material: string;
+  materialEn?: string;
   partsToday: number;
   partsTarget: number;
   completionRate: number;
   primaryTool: string;
+  primaryToolEn?: string;
   
   // 切削週期與時間
   cycleTotalSec: number;
@@ -399,11 +414,14 @@ export function useFactoryHeartbeat(
     workOrderId: activeOrderId,
     workOrder: currentOrder.code,
     partName: currentOrder.partName,
+    partNameEn: currentOrder.partNameEn,
     material: currentOrder.material,
+    materialEn: currentOrder.materialEn,
     partsToday,
     partsTarget: currentOrder.targetPcs,
     completionRate,
     primaryTool: currentOrder.primaryTool,
+    primaryToolEn: currentOrder.primaryToolEn,
 
     cycleTotalSec,
     cycleRemainSec,
