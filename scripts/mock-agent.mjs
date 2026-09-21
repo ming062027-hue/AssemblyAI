@@ -88,6 +88,15 @@ function route(text) {
     };
   }
 
+  if (/(現在要做什麼|做什麼事|要做什麼|要幹嘛|該做什麼|接下來.*做什麼|我要做什麼|我們要做什麼|有什麼.*事|待辦|任務|下一步|what to do|what should i do)/i.test(lower)) {
+    return {
+      action: "switch_view",
+      tool: "switch_console_view",
+      arguments: { view: "f1" },
+      agent: ["目前產線第一優先任務：04 加工區 M03 處於 414 軸過載警報停機中，建議先排查主軸或開立維修單。"],
+    };
+  }
+
   if (/\barms?\b|\btorque\b|\bf3\b|手臂|刀具|刀庫|磨損/.test(lower)) {
     return {
       action: "switch_view",

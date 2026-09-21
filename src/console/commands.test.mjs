@@ -113,4 +113,11 @@ describe("15 Universal Quick Actions for CNC-640 Console", () => {
     assert.equal(res.navigate, "f1");
     assert.match(res.response, /總體 OEE 87.5%/);
   });
+
+  it("16. 現在要做什麼事 -> F1, 現場即時任務指引", () => {
+    const res = interpret("現在要做什麼事", ctx);
+    assert.equal(res.actionId, "action.guidance");
+    assert.equal(res.navigate, "f1");
+    assert.match(res.response, /當前第一優先任務|待辦維修事項|產線順暢推進/);
+  });
 });

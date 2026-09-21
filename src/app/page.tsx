@@ -275,13 +275,13 @@ export default function Home() {
 
   useEffect(() => {
     if (bridge.lastAgentSay) {
-      setMvReply(bridge.lastAgentSay);
       openDialog();
-      if (voiceOn && !bridge.isLiveMode) {
+      // 僅在純英文語音代理模式且本地未發聲時才播報英文，避免與中文語音雙重混音
+      if (voiceOn && !bridge.isLiveMode && mvCtx.lang === "en") {
         speak(bridge.lastAgentSay, "en");
       }
     }
-  }, [bridge.lastAgentSay, bridge.isLiveMode, voiceOn, speak, openDialog]);
+  }, [bridge.lastAgentSay, bridge.isLiveMode, voiceOn, speak, openDialog, mvCtx.lang]);
 
   useEffect(() => {
     if (bridge.lastUserSay) {
@@ -379,17 +379,17 @@ export default function Home() {
 
   // 🎙️ 免接觸「嘿宇宙」/「宇宙」喚醒監聽（現場黑手免觸摸螢幕，Siri 級無感體驗）
   useWakeWordListener({
-    enabled: wakeEnabled,
+    enabled: wakeEnabled && !mvListening,
     onWake: () => {
+      window.speechSynthesis?.cancel();
       openDialog();
-      playWakeChime();
       const msg = "我在，請說！";
       setMvReply(msg);
       speak(msg, "zh");
     },
     onCommand: (cmd) => {
+      window.speechSynthesis?.cancel();
       openDialog();
-      playWakeChime();
       sendQuick(cmd);
     },
   });
@@ -415,6 +415,10 @@ export default function Home() {
 
   // 點麥克風：用瀏覽器內建語音辨識（Chrome 免費）真的聽你講中文。
   const onMic = useCallback(() => {
+    // 立即中斷先前仍在發聲的開機巡檢或舊語音，避免重疊混音
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     if (liveModeWanted || bridge.isLiveMode) {
       void toggleVoiceSession();
       return;
@@ -445,10 +449,11 @@ export default function Home() {
     rec.onresult = (e) => {
       const transcript = e.results[0][0].transcript;
       setMvDraft(transcript);
+      // 1. 本地 CNC-640 控制台一律立即執行指令，確保畫面因應與中文語音 100% 響應！
+      runModelCommand(transcript);
+      // 2. 若 Bridge 在線，同步送出文字給後端代理
       if (bridge.status === "listening" || bridge.status === "speaking" || bridge.status === "thinking") {
         bridge.sendSay(transcript);
-      } else {
-        runModelCommand(transcript);
       }
     };
     rec.onend = () => setMvListening(false);
@@ -2458,14 +2463,17 @@ export default function Home() {
                   {bridge.lastUserSay}
                 </div>
               )}
-              {bridge.lastAgentSay ? (
+              {mvReply ? (
+                <div className="text-slate-900 bg-emerald-50/60 p-1.5 rounded border border-emerald-200">
+                  <span className="font-bold text-emerald-800">🤖 MODEL宇宙：</span>
+                  {mvReply}
+                </div>
+              ) : bridge.lastAgentSay ? (
                 <div className="text-slate-900 bg-emerald-50/60 p-1.5 rounded border border-emerald-200">
                   <span className="font-bold text-emerald-800">🤖 MODEL宇宙：</span>
                   {bridge.lastAgentSay}
                 </div>
-              ) : (
-                !bridge.lastUserSay && <div className="text-slate-700">{mvReply}</div>
-              )}
+              ) : null}
               {bridge.error && (
                 <div className="text-rose-700 bg-rose-50 p-1.5 rounded border border-rose-300 text-[10px] font-mono">
                   ⚠ {bridge.error}

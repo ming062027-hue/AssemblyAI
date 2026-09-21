@@ -253,6 +253,51 @@ export function buildShiftSummary(tickets: Ticket[], urges: number): string {
   );
 }
 
+/** 現場任務指引：依即時警報、待修單、庫存與生產進度，告訴現場操作員「現在要做什麼事」。 */
+export function buildNextActionGuidance(extra: InterpretExtra = {}): { text: string; view: ScreenKey } {
+  const tickets = extra.tickets ?? [];
+  const openTickets = tickets.filter((t) => (t.status ?? "open") === "open");
+  const low = stockWarnings();
+
+  // 1. 最高優先度：機台警報
+  let alarmCount = 0;
+  for (const id of STATION_IDS) {
+    const m = get_machine_status({ machine_id: id });
+    if (!("error" in m) && m.status === "alarm") {
+      alarmCount++;
+    }
+  }
+
+  if (alarmCount > 0) {
+    return {
+      view: "f1",
+      text: "【當前第一優先任務】04 加工區（M03）處於 414 軸過載警報停機中！現在最重要的是排查主軸負載與刀具磨損，或對我說「開立維修單」通知保修技師到場處置。",
+    };
+  }
+
+  // 2. 次高優先度：待修工單
+  if (openTickets.length > 0) {
+    return {
+      view: "f1",
+      text: `【待辦維修事項】目前有 ${openTickets.length} 張維修單（${openTickets.map((t) => t.ticket_id).join("、")}）待修中。若技師已檢修完畢，請對我說「${openTickets[0].ticket_id} 修好了」進行結案。`,
+    };
+  }
+
+  // 3. 原料預警
+  if (low.length > 0) {
+    return {
+      view: "f4",
+      text: `【物料補給任務】原料偏低：${low.map((s) => `${s.id} 剩餘 ${s.left}`).join("、")}，建議點擊 F4 叫料，或對我說「調度 AGV 補料」或「催料」。`,
+    };
+  }
+
+  // 4. 生產正常：推進生產與品檢
+  return {
+    view: "f1",
+    text: "【產線順暢推進】全線 5 站運轉正常無警報！目前工單 #WO-2026-A109 當班進度 348/500 件（69.6%），建議可點擊 F6 查看最新三次元品檢，或至 F7 檢查設備軸承健康度。",
+  };
+}
+
 /** AGV 電量示意值（跟 F2 車隊畫面同一組數字）。 */
 const AGV_BATTERY = [
   { id: "AGV-01", level: 88, note: "搬運中" },
@@ -393,6 +438,17 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       ...base,
       actionId: "ticket.resolve",
       response: "請告訴我單號，例如「RT-1001 修好了」或「解除工單 RT-1002」。",
+    };
+  }
+
+  // 0.59) 現場任務指引：詢問「現在要做什麼事 / 接下來做什麼 / 有什麼事要做 / 待辦事項」
+  if (/(現在要做什麼|做什麼事|要做什麼|要幹嘛|該做什麼|接下來.*做什麼|我要做什麼|我們要做什麼|有什麼.*事|待辦|任務|下一步|what to do|what should i do)/i.test(text)) {
+    const guide = buildNextActionGuidance({ tickets: extra.tickets ?? [], urges: extra.urges ?? 0 });
+    return {
+      ...base,
+      navigate: guide.view,
+      actionId: "action.guidance",
+      response: guide.text,
     };
   }
 

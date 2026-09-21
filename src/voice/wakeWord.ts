@@ -105,18 +105,19 @@ export function useWakeWordListener({
           const match = transcript.match(WAKE_WORD_RE);
           if (match) {
             playWakeChime();
-            onWakeRef.current?.();
 
-            // 檢查喚醒詞後方是否連帶了指令（例如：「嘿宇宙查 414 警報」）
+            // 檢查喚醒詞後方是否連帶了指令（例如：「嘿宇宙查 414 警報」或「宇宙現在要做什麼」）
             const afterWake = transcript
               .slice((match.index ?? 0) + match[0].length)
               .replace(/^[，,。.！？!?\s]+/, "")
               .trim();
 
             if (afterWake && onCommandRef.current) {
-              setTimeout(() => {
-                onCommandRef.current?.(afterWake);
-              }, 400);
+              // 連帶指令：直接執行指令回覆，不重複插話「我在請說」避免雙重語音
+              onCommandRef.current(afterWake);
+            } else {
+              // 單純喊喚醒詞：回答「我在，請說！」
+              onWakeRef.current?.();
             }
             break;
           }
