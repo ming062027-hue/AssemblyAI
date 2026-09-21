@@ -113,6 +113,22 @@ function route(text) {
       agent: ["Switching console display to repair tickets and external contacts."],
     };
   }
+  if (/\bquality\b|\bcmm\b|\binspection\b|\bf6\b|品檢|公差|粗糙度/.test(lower)) {
+    return {
+      action: "switch_view",
+      tool: "switch_console_view",
+      arguments: { view: "f6" },
+      agent: ["Switching console display to AI vision and CMM precision quality inspection."],
+    };
+  }
+  if (/\benergy\b|\bcarbon\b|\bhealth\b|\bf7\b|能源|耗電|電費|碳排|健康/.test(lower)) {
+    return {
+      action: "switch_view",
+      tool: "switch_console_view",
+      arguments: { view: "f7" },
+      agent: ["Switching console display to green energy telemetry and predictive machine health."],
+    };
+  }
 
   const machineHit = lower.match(MACHINE_RE);
   const rest = machineHit ? lower.replace(machineHit[0], " ") : lower;

@@ -81,15 +81,15 @@ export const TOOLS_S0 = [
   {
     type: "function",
     name: "switch_console_view",
-    description: "Switch the CNC-640 console display view. f1 for process overview, f2 for AGV fleet, f3 for robotic arm torque, f4 for coolant & materials, f5 for repair tickets.",
+    description: "Switch the CNC-640 console display view. f1 for process overview, f2 for AGV fleet, f3 for robotic arm torque, f4 for coolant & materials, f5 for repair tickets, f6 for vision & CMM quality inspection, f7 for energy & predictive maintenance.",
     parameters: {
       type: "object",
       properties: {
         view: {
           type: "string",
           description: "Target view identifier.",
-          enum: ["f1", "f2", "f3", "f4", "f5"],
-          examples: ["f1", "f3"]
+          enum: ["f1", "f2", "f3", "f4", "f5", "f6", "f7"],
+          examples: ["f1", "f3", "f6", "f7"]
         }
       },
       required: ["view"]

@@ -18,7 +18,7 @@ import {
   type Ticket,
 } from "@/tools/handlers";
 
-export type ScreenKey = "f1" | "f2" | "f3" | "f4" | "f5";
+export type ScreenKey = "f1" | "f2" | "f3" | "f4" | "f5" | "f6" | "f7";
 
 export interface ScreenDef {
   key: ScreenKey;
@@ -34,6 +34,8 @@ export const SCREENS: ScreenDef[] = [
   { key: "f3", code: "F3", name: "手臂軸向數據", en: "Robot Arm", keywords: ["手臂", "機械手臂", "軸", "數據", "扭矩", "伺服", "arm", "robot", "torque", "servo"] },
   { key: "f4", code: "F4", name: "原料庫存", en: "Inventory", keywords: ["庫存", "原料", "補料", "叫料", "材料", "inventory", "material", "stock"] },
   { key: "f5", code: "F5", name: "AI 通話紀錄", en: "Call Log", keywords: ["通話", "通訊錄", "紀錄", "外部", "採購", "報修紀錄", "電話", "call", "log"] },
+  { key: "f6", code: "F6", name: "智能品檢與尺寸公差", en: "Vision & CMM QC", keywords: ["品檢", "檢驗", "公差", "良率", "瑕疵", "粗糙度", "三次元", "cmm", "qc", "inspection", "quality"] },
+  { key: "f7", code: "F7", name: "綠色能源與設備健康", en: "Energy & Maintenance", keywords: ["能源", "耗電", "電費", "碳排", "綠能", "功耗", "健康", "預測", "軸承", "震動", "潤滑油", "切削水", "能耗", "energy", "power", "carbon", "health"] },
 ];
 
 export interface CommandContext {
@@ -64,6 +66,7 @@ export interface CommandResult {
   clearAlarm?: boolean; // set when the alarm must be cleared (panel hides, 04 normal)
   agv?: { id: string; task: string }; // set when an AGV dispatch was requested
   supplier?: { material: string }; // set when a supplier urge-call was requested
+  workOrder?: "A109" | "B202" | "C303"; // set when a work order switch was requested
   actionId: string | null; // ACTIONS registry id (派工包 v2 §2.2)
   alarm?: Alarm; // set when an alarm was looked up (show on F3)
   machine?: Machine; // set when a machine status was looked up
@@ -77,9 +80,9 @@ export interface ActionDef {
   hint: string;
 }
 export const ACTIONS: ActionDef[] = [
-  { id: "nav.view", keywords: /流程監控|通訊錄|切換|畫面|f ?[1-5]|流程|監控|總覽|戰情|手臂|arm|庫存|inventory|通話|call|agv|車隊/, hint: "切換 F1–F5 畫面（說編號或名稱都行）" },
+  { id: "nav.view", keywords: /流程監控|通訊錄|切換|畫面|f ?[1-7]|流程|監控|總覽|戰情|手臂|arm|庫存|inventory|通話|call|agv|車隊|品檢|公差|qc|cmm|能源|耗電|健康/, hint: "切換 F1–F7 畫面（說編號或名稱都行）" },
   { id: "alarm.lookup", keywords: /警報|alarm|\d{3,4}/, hint: "查警報碼" },
-  { id: "alarm.clear", keywords: /解除警報|警報重置|清除警報|警報靜音|靜音|f ?6|reset alarm|clear alarm|alarm reset|silence alarm|mute/, hint: "解除警報（F6）" },
+  { id: "alarm.clear", keywords: /解除警報|警報重置|清除警報|警報靜音|靜音|f ?[68]|reset alarm|clear alarm|alarm reset|silence alarm|mute/, hint: "解除警報（F8）" },
   { id: "ticket.create", keywords: /開.*單|維修單|報修|repair|ticket/, hint: "開維修單" },
   { id: "ticket.resolve", keywords: /修好|維修完成|解除工單|完工|結案|fixed|resolved|done|complete/, hint: "維修完成解除工單" },
   { id: "agv.dispatch", keywords: /調度|補料|送料|出車|dispatch|agv/, hint: "AGV 調度補料" },
@@ -91,17 +94,21 @@ export const ACTIONS: ActionDef[] = [
   { id: "ticket.status", keywords: /單號|進度|ticket status/, hint: "查單號進度（例 RT-1001 進度）" },
   { id: "lang.switch", keywords: /切換英文|切換中文|switch to english|switch to chinese/, hint: "中英切換" },
   { id: "shift.handover", keywords: /交班|下班|換班|handover/, hint: "交班摘要（今日單數／解除／催料）" },
+  { id: "qc.report", keywords: /品檢|檢驗|公差|良率|瑕疵|粗糙度|quality|inspection|qc|cmm/, hint: "三次元與 AI 視覺智能品檢分析報告" },
+  { id: "energy.report", keywords: /能源|耗電|電費|碳排|綠能|功耗|energy|power|carbon/, hint: "全廠即時功率、耗電、電費與 ESG 碳排跳錶" },
+  { id: "health.report", keywords: /設備健康|健康度|軸承|震動|潤滑油|切削水|預測維護|health/, hint: "主軸軸承震動頻譜與預測性維護健康矩陣" },
+  { id: "workorder.switch", keywords: /切換工單|換工單|換切|切換到|工單 a109|工單 b202|工單 c303|閥體|人工關節|渦輪葉片/, hint: "切換 MES 工單配方 (A109 葉片 / B202 閥體 / C303 人工關節)" },
 ];
 
 /** Example chips shown in the UI (bilingual) so 大銘 can click to demo. */
 export const PRESET_COMMANDS: string[] = [
-  "機台 3 狀態",
+  "查看品檢報告",
+  "工廠耗電多少",
+  "設備健康度",
+  "換切燃油閥體",
   "查警報 414",
   "開維修單",
   "看手臂數據",
-  "看主管看板",
-  "查警報 9999",
-  "耗材還夠嗎",
   "交班摘要",
 ];
 
@@ -294,10 +301,10 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
   const t = text.toLowerCase();
   const en = ctx.lang === "en";
 
-  // F0) 短編號直跳：說 F1–F5 切對應畫面，F6＝警報靜音/解除（跟按鈕同一個功能）。
-  const fHit = t.match(/f\s?([1-6])\b/);
+  // F0) 短編號直跳：說 F1–F7 切對應畫面，F8＝警報靜音/解除。
+  const fHit = t.match(/f\s?([1-8])\b/);
   if (fHit) {
-    if (fHit[1] === "6") {
+    if (fHit[1] === "8") {
       base.context.alarm = null;
       return {
         ...base,
@@ -307,8 +314,10 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       };
     }
     const key = `f${fHit[1]}` as ScreenKey;
-    const s = SCREENS.find((x) => x.key === key)!;
-    return { ...base, navigate: key, actionId: "nav.view", response: `好的，切換到「${s.name}」。` };
+    const s = SCREENS.find((x) => x.key === key);
+    if (s) {
+      return { ...base, navigate: key, actionId: "nav.view", response: `好的，切換到「${s.name}」。` };
+    }
   }
 
   // F0.5) 上一句推播問「要不要切畫面」：只認整句 好／不要（「要開單」這種不算）。
@@ -433,6 +442,71 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       navigate: "f1",
       actionId: "report.briefing",
       response: buildExecutiveBriefing(extra.tickets ?? [], extra.urges ?? 0),
+    };
+  }
+
+  // 0.66) 智能品檢與尺寸公差 (CMM & AI Vision QC)。
+  if (/(品檢|檢驗|公差|良率|瑕疵|粗糙度|三次元|cmm|qc|quality|inspection)/i.test(text)) {
+    return {
+      ...base,
+      navigate: "f6",
+      actionId: "qc.report",
+      response:
+        "報告主管，最新完工 Part #348 經三次元與 AI 視覺掃描：表面粗糙度 Ra 0.38µm（標準 <0.8µm），真圓度與輪廓公差 ±0.003mm 全數合格，0 毛刺 0 裂痕，當班良率 99.71%。",
+    };
+  }
+
+  // 0.67) 綠色能源與 ESG 碳排 (Energy & Carbon)。
+  if (/(能源|耗電|電費|碳排|綠能|功耗|能耗|energy|power|carbon|kwh)/i.test(text)) {
+    return {
+      ...base,
+      navigate: "f7",
+      actionId: "energy.report",
+      response:
+        "目前全機運轉總功率 28.4 kW，今日累計耗電 184.6 度，依工業電價折算約 646.1 元（20.2 美元），ESG 碳排 91.3 kg CO2e，太陽能綠電自給率 36.8%。",
+    };
+  }
+
+  // 0.68) 設備預測性健康維護 (Predictive Maintenance)。
+  if (/(設備健康|健康度|軸承|震動|潤滑油|切削水|預測維護|預測性維護|health)/i.test(text)) {
+    return {
+      ...base,
+      navigate: "f7",
+      actionId: "health.report",
+      response:
+        "設備預測健康度診斷：主軸軸承震動頻譜健康度 94.2%（ISO 10816: 0.82mm/s 運轉優良），滾珠螺桿潤滑油存量 68%（預估可用 48 小時），切削水濃度 8.5% 微偏低，空壓 0.65 MPa 正常。",
+    };
+  }
+
+  // 0.69) MES 工單配方切換 (Work Order Preset Switcher)。
+  if (/(切換工單|換工單|換切|切換到|工單\s*[abc]?\d+|a109|b202|c303|閥體|人工關節|渦輪葉片)/i.test(text)) {
+    if (/(b202|閥體|燃油|鋁合金|7075)/i.test(text)) {
+      return {
+        ...base,
+        navigate: "f1",
+        actionId: "workorder.switch",
+        workOrder: "B202",
+        response:
+          "已切換至工單 #WO-2026-B202 航太高壓燃油閥體（AL7075-T6 航太鋁），載入加工檔 0202_VALVE.NC，主軸目標設定 12,000 RPM，主刀具 T02 粗銑刀，週期 3 分 15 秒。",
+      };
+    }
+    if (/(c303|人工關節|髖關節|醫療|不鏽鋼|316l)/i.test(text)) {
+      return {
+        ...base,
+        navigate: "f1",
+        actionId: "workorder.switch",
+        workOrder: "C303",
+        response:
+          "已切換至工單 #WO-2026-C303 醫療級人工髖關節球體（SUS316L 醫療不鏽鋼），載入加工檔 0303_HIP.NC，主軸目標設定 6,800 RPM，主刀具 T01 面銑刀，週期 5 分 40 秒。",
+      };
+    }
+    return {
+      ...base,
+      navigate: "f1",
+      actionId: "workorder.switch",
+      workOrder: "A109",
+      response:
+        "已切換至工單 #WO-2026-A109 航太發動機渦輪葉片（Ti-6Al-4V 鈦合金），載入加工檔 0415_BLADE.NC，主軸目標設定 8,500 RPM，主刀具 T03 精銑球刀，週期 4 分 30 秒。",
     };
   }
 

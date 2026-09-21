@@ -36,7 +36,7 @@ declare global {
   }
 }
 
-type ViewKey = "f1" | "f2" | "f3" | "f4" | "f5";
+type ViewKey = "f1" | "f2" | "f3" | "f4" | "f5" | "f6" | "f7";
 
 const TAB_NAMES: Record<ViewKey, string> = {
   f1: "F1 流程監控總覽",
@@ -44,6 +44,8 @@ const TAB_NAMES: Record<ViewKey, string> = {
   f3: "F3 手臂軸向數據分析",
   f4: "F4 原料庫存與補叫料",
   f5: "F5 AI 外部通訊錄明細",
+  f6: "F6 智能品檢與尺寸公差",
+  f7: "F7 綠色能源與設備健康",
 };
 
 // 派工包 v2 §2.1 中央狀態：五站子項各自燈號（§3 表）。
@@ -98,8 +100,8 @@ export default function Home() {
   const [supplierMsg, setSupplierMsg] = useState<string | null>(null);
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 🏭 工廠真實心跳動態引擎（G-code 滾動、週期倒數、OEE、停機損失計價、刀具磨損）
-  const heartbeat = useFactoryHeartbeat(isAlarm);
+  // 🏭 工廠真實心跳動態引擎（G-code 滾動、週期倒數、OEE、停機損失計價、刀具磨損、三大工單、故障演練、品檢、綠能）
+  const heartbeat = useFactoryHeartbeat(isAlarm, (alarm) => setIsAlarm(alarm));
   const [wakeEnabled, setWakeEnabled] = useState(true);
 
   // Model宇宙 語音管家
@@ -154,7 +156,7 @@ export default function Home() {
       openDialog();
       if (name === "switch_console_view") {
         const v = String(args.view ?? "f1").toLowerCase() as ViewKey;
-        if (["f1", "f2", "f3", "f4", "f5"].includes(v)) {
+        if (["f1", "f2", "f3", "f4", "f5", "f6", "f7"].includes(v)) {
           setView(v);
           return { success: true, active_view: v, view_name: TAB_NAMES[v] };
         }
@@ -163,6 +165,7 @@ export default function Home() {
       if (name === "clear_machine_alarm") {
         setIsAlarm(false);
         setMvCtx(emptyContext());
+        heartbeat.injectFault("none");
         return { success: true, message: "Alarm cleared. Machine returned to normal." };
       }
       if (name === "lookup_alarm") {
@@ -307,6 +310,7 @@ export default function Home() {
   // 語音上下文的 alarm 也清空，下一句「開維修單」不會再沿用舊警報。
   const clearAlarm = useCallback(() => {
     setIsAlarm(false);
+    heartbeat.injectFault("none");
     setMvCtx(emptyContext());
     const msg = "警報已解除，04 加工區恢復正常，警報面板已收回。";
     setMvReply(msg);
@@ -315,7 +319,7 @@ export default function Home() {
     if (bridge.status === "listening" || bridge.status === "speaking" || bridge.status === "thinking") {
       bridge.sendSay("clear machine alarm");
     }
-  }, [speak, openDialog, bridge]);
+  }, [speak, openDialog, bridge, heartbeat]);
 
   const runModelCommand = useCallback(
     (text: string) => {
@@ -327,12 +331,16 @@ export default function Home() {
       setMvReply(res.response);
       speak(res.response, res.context.lang);
       if (res.clearAlarm) {
-        setIsAlarm(false); // 跟按鈕/F6 同一個效果
+        setIsAlarm(false); // 跟按鈕/F8 同一個效果
+        heartbeat.injectFault("none");
       } else if (res.alarm) {
         setIsAlarm(true); // 異常推播：紅球＋警報面板跳出＋回話問切畫面
         setView("f1"); // 警報 → 讓總覽亮起來（站別 04＋伺服＋CLOSED-LOOP）
       } else if (res.navigate) {
         setView(res.navigate);
+      }
+      if (res.workOrder) {
+        heartbeat.switchWorkOrder(res.workOrder);
       }
       if (res.agv) dispatchAgv(res.agv.id, res.agv.task);
       if (res.supplier) callSupplierManual(supplierName(res.supplier.material));
@@ -341,7 +349,7 @@ export default function Home() {
       setMvListening(false);
       openDialog(); // 講完彈出對話框，6 秒後自動收回
     },
-    [mvCtx, urgeCount, speak, openDialog, dispatchAgv, callSupplierManual],
+    [mvCtx, urgeCount, speak, openDialog, dispatchAgv, callSupplierManual, heartbeat],
   );
 
   const toggleVoiceSession = useCallback(async () => {
@@ -589,7 +597,7 @@ export default function Home() {
               <span>•</span>
               <span>VIEW: {TAB_NAMES[view]}</span>
               <span>•</span>
-              <span className="text-slate-300">工單: #WO-2026-A109 (航太鈦合金葉片)</span>
+              <span className="text-slate-300">工單: {heartbeat.workOrder} ({heartbeat.partName})</span>
             </div>
           </div>
         </div>
@@ -647,6 +655,135 @@ export default function Home() {
         <main className="flex-1 space-y-4">
           {/* ============ F1 流程監控總覽（放大五站 + 警報才出現的面板） ============ */}
           <div className={view === "f1" ? "space-y-4" : "space-y-4 hidden"}>
+            {/* 🎛️ 工業 4.0 現場操作中樞：MES 工單切換配方 ＋ 現場故障應急演練模擬條 */}
+            <div className="p-3 bg-white/90 border border-[#9aa3b4] rounded-lg shadow-sm flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
+              {/* 左側：MES 多工單配方切換 */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 whitespace-nowrap">
+                  <i data-lucide="layers" className="w-3.5 h-3.5 text-[#0056b3]" />
+                  MES 工單配方:
+                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => heartbeat.switchWorkOrder("A109")}
+                    className={`px-2.5 py-1 text-xs font-mono rounded border transition flex items-center gap-1 font-semibold ${
+                      heartbeat.workOrderId === "A109"
+                        ? "bg-[#0056b3] text-white border-blue-600 shadow-sm"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300"
+                    }`}
+                  >
+                    <span>A109 渦輪葉片</span>
+                    <span className="text-[10px] opacity-80">(8.5k RPM)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => heartbeat.switchWorkOrder("B202")}
+                    className={`px-2.5 py-1 text-xs font-mono rounded border transition flex items-center gap-1 font-semibold ${
+                      heartbeat.workOrderId === "B202"
+                        ? "bg-[#0056b3] text-white border-blue-600 shadow-sm"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300"
+                    }`}
+                  >
+                    <span>B202 燃油閥體</span>
+                    <span className="text-[10px] opacity-80">(12k RPM)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => heartbeat.switchWorkOrder("C303")}
+                    className={`px-2.5 py-1 text-xs font-mono rounded border transition flex items-center gap-1 font-semibold ${
+                      heartbeat.workOrderId === "C303"
+                        ? "bg-[#0056b3] text-white border-blue-600 shadow-sm"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300"
+                    }`}
+                  >
+                    <span>C303 人工關節</span>
+                    <span className="text-[10px] opacity-80">(6.8k RPM)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 右側：現場故障演練注入模擬器 */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 border-t md:border-t-0 md:border-l md:pl-3 border-slate-200">
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 whitespace-nowrap">
+                  <i data-lucide="zap" className="w-3.5 h-3.5 text-rose-600" />
+                  1鍵故障演練:
+                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => heartbeat.injectFault("414")}
+                    title="模擬 414 / E-402 軸負載過載 142% 卡死"
+                    className={`px-2 py-1 text-xs font-mono rounded border transition font-bold flex items-center gap-1 ${
+                      heartbeat.activeFault === "414"
+                        ? "bg-rose-700 text-white border-rose-900 shadow-sm animate-pulse"
+                        : "bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-200"
+                    }`}
+                  >
+                    🚨 414 軸過載
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => heartbeat.injectFault("E108")}
+                    title="模擬 E-108 主軸軸承過溫 88.4°C"
+                    className={`px-2 py-1 text-xs font-mono rounded border transition font-bold flex items-center gap-1 ${
+                      heartbeat.activeFault === "E108"
+                        ? "bg-amber-600 text-white border-amber-800 shadow-sm animate-pulse"
+                        : "bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200"
+                    }`}
+                  >
+                    🌡️ E-108 主軸過溫
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => heartbeat.injectFault("E305")}
+                    title="模擬 E-305 切削水泵斷流 <1.2 bar"
+                    className={`px-2 py-1 text-xs font-mono rounded border transition font-bold flex items-center gap-1 ${
+                      heartbeat.activeFault === "E305"
+                        ? "bg-sky-700 text-white border-sky-900 shadow-sm animate-pulse"
+                        : "bg-sky-50 hover:bg-sky-100 text-sky-800 border-sky-200"
+                    }`}
+                  >
+                    💧 E-305 冷卻斷流
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => clearAlarm()}
+                    title="解除所有故障演練與警報，恢復全線正常運作"
+                    className="px-2 py-1 text-xs font-mono rounded border transition font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300 flex items-center gap-1"
+                  >
+                    ✅ 復歸正常
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 演練中警報醒目條 */}
+            {heartbeat.activeFault !== "none" && (
+              <div className="p-3 rounded-lg border-2 border-rose-500 bg-rose-50 shadow-md flex items-center justify-between gap-3 text-xs font-mono">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-rose-600 animate-ping" />
+                  <span className="font-bold text-rose-900 text-sm">{heartbeat.faultTitle}</span>
+                  <span className="text-rose-800">— {heartbeat.faultDesc}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-600 font-semibold hidden sm:inline">【演練中】喊「宇宙，解除警報」或點擊右側復歸</span>
+                  <button
+                    type="button"
+                    onClick={() => clearAlarm()}
+                    className="px-2.5 py-1 bg-rose-700 hover:bg-rose-800 text-white rounded font-bold shadow-sm"
+                  >
+                    手動復歸
+                  </button>
+                </div>
+              </div>
+            )}
+
             <section className="hh-card rounded-lg p-4">
               <div className="flex justify-between items-center pb-2 mb-2.5 border-b border-[#9aa3b4]">
                 <h2 className="text-sm font-bold flex items-center gap-2 text-[#202731]">
@@ -1633,9 +1770,352 @@ export default function Home() {
               </div>
             </div>
           </div>
+
+          {/* ============ F6 智能品檢與尺寸公差分析 (AI Vision & CMM Precision QC) ============ */}
+          <div className={view === "f6" ? "hh-card rounded-lg p-5 space-y-4" : "hidden hh-card rounded-lg p-5 space-y-4"}>
+            <div className="flex justify-between items-center border-b border-[#9aa3b4] pb-2">
+              <h2 className="text-base font-bold text-[#202731] flex items-center gap-2">
+                <i data-lucide="scan-line" className="w-5 h-5 text-[#0056b3]" />
+                智能品檢與尺寸公差分析 · 三次元 CMM & AI 視覺掃描
+              </h2>
+              <div className="flex items-center gap-2 text-xs font-mono">
+                <span className="text-slate-600">連動第 05 站「品檢入庫 AGV」</span>
+                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">
+                  ● CMM ONLINE
+                </span>
+              </div>
+            </div>
+
+            {/* 頂部四指標卡 */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+              <div className="p-3 bg-white rounded border border-slate-300 shadow-sm">
+                <div className="text-slate-500 font-semibold">最新完工送檢</div>
+                <div className="text-lg font-bold text-slate-800 mt-0.5">{heartbeat.inspectionPartId}</div>
+                <div className="text-[11px] text-slate-400 mt-1">工單 {heartbeat.workOrder}</div>
+              </div>
+              <div className="p-3 bg-white rounded border border-slate-300 shadow-sm">
+                <div className="text-slate-500 font-semibold">表面粗糙度 (Ra)</div>
+                <div className="text-lg font-bold text-emerald-700 mt-0.5">{heartbeat.surfaceRoughnessRa} µm</div>
+                <div className="text-[11px] text-emerald-600 mt-1">基準 &lt;0.8 µm (合格)</div>
+              </div>
+              <div className="p-3 bg-white rounded border border-slate-300 shadow-sm">
+                <div className="text-slate-500 font-semibold">輪廓/真圓度公差</div>
+                <div className="text-lg font-bold text-emerald-700 mt-0.5">±{heartbeat.circularityTolerance} mm</div>
+                <div className="text-[11px] text-emerald-600 mt-1">公差 ±0.008 mm (合格)</div>
+              </div>
+              <div className="p-3 bg-white rounded border border-slate-300 shadow-sm">
+                <div className="text-slate-500 font-semibold">當班總檢驗良率</div>
+                <div className="text-lg font-bold text-blue-700 mt-0.5">{heartbeat.shiftYieldRate}%</div>
+                <div className="text-[11px] text-slate-500 mt-1">合格 {heartbeat.shiftPartsPassed} / 總量 {heartbeat.shiftPartsInspected}</div>
+              </div>
+            </div>
+
+            {/* 雙欄：左側 CMM 高精度幾何公差明細，右側 AI 視覺光學外觀與 QR 印章 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* 左側：三次元 CMM 幾何尺寸量測 */}
+              <div className="p-4 bg-white rounded border border-slate-300 space-y-3 shadow-sm">
+                <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                  <span className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+                    <i data-lucide="crosshair" className="w-4 h-4 text-blue-600" />
+                    三次元 (CMM) 關鍵幾何尺寸精度報告
+                  </span>
+                  <span className="text-[11px] font-mono text-slate-400">ZEISS ACCURA 聯網</span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs font-mono border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-700 text-left border-b border-slate-300">
+                        <th className="p-2">量測特徵項目</th>
+                        <th className="p-2">工程標稱</th>
+                        <th className="p-2">實測值</th>
+                        <th className="p-2">公差偏差</th>
+                        <th className="p-2 text-center">判定</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      <tr>
+                        <td className="p-2 font-bold text-slate-800">葉根榫頭厚度 (Base T)</td>
+                        <td className="p-2 text-slate-600">18.500 mm</td>
+                        <td className="p-2 font-bold text-slate-900">18.498 mm</td>
+                        <td className="p-2 text-emerald-700 font-semibold">-0.002 mm</td>
+                        <td className="p-2 text-center"><span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">PASS</span></td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 font-bold text-slate-800">葉根安裝銷孔 (Pin Hole)</td>
+                        <td className="p-2 text-slate-600">Ø8.000 mm</td>
+                        <td className="p-2 font-bold text-slate-900">Ø8.001 mm</td>
+                        <td className="p-2 text-emerald-700 font-semibold">+0.001 mm</td>
+                        <td className="p-2 text-center"><span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">PASS</span></td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 font-bold text-slate-800">前緣流線型面輪廓度</td>
+                        <td className="p-2 text-slate-600">0.000 mm</td>
+                        <td className="p-2 font-bold text-slate-900">0.002 mm</td>
+                        <td className="p-2 text-emerald-700 font-semibold">+0.002 mm</td>
+                        <td className="p-2 text-center"><span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">PASS</span></td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 font-bold text-slate-800">尾緣厚度 (Trailing Edge)</td>
+                        <td className="p-2 text-slate-600">1.200 mm</td>
+                        <td className="p-2 font-bold text-slate-900">1.203 mm</td>
+                        <td className="p-2 text-emerald-700 font-semibold">+0.003 mm</td>
+                        <td className="p-2 text-center"><span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">PASS</span></td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 font-bold text-slate-800">表面粗糙度 (Ra)</td>
+                        <td className="p-2 text-slate-600">&lt; 0.80 µm</td>
+                        <td className="p-2 font-bold text-slate-900">0.38 µm</td>
+                        <td className="p-2 text-emerald-700 font-semibold">-0.42 µm</td>
+                        <td className="p-2 text-center"><span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">PASS</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="p-2.5 bg-blue-50 border border-blue-200 rounded text-xs text-blue-900 font-mono">
+                  💡 <strong>CMM 智能閉環反饋：</strong>平均幾何尺寸精度在 ±0.002mm 以內，無需進行 CNC 刀長刀徑磨耗補償 (Tool Wear Offset: 0.000mm)。
+                </div>
+              </div>
+
+              {/* 右側：AI 光學視覺瑕疵掃描與出庫打標印章 */}
+              <div className="p-4 bg-white rounded border border-slate-300 space-y-3 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-center border-b border-slate-200 pb-2 mb-3">
+                    <span className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+                      <i data-lucide="eye" className="w-4 h-4 text-purple-600" />
+                      AI 機器視覺表面瑕疵掃描 (Visual AI Defect)
+                    </span>
+                    <span className="text-[11px] font-mono text-purple-700 font-bold">100% 表面檢測</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs font-mono mb-3">
+                    <div className="p-2.5 bg-slate-50 border rounded flex justify-between items-center">
+                      <span className="text-slate-600">邊緣毛刺檢測 (Burrs)</span>
+                      <span className="font-bold text-emerald-700">0 處 (合格)</span>
+                    </div>
+                    <div className="p-2.5 bg-slate-50 border rounded flex justify-between items-center">
+                      <span className="text-slate-600">微裂痕/暗紋 (Cracks)</span>
+                      <span className="font-bold text-emerald-700">0 處 (合格)</span>
+                    </div>
+                    <div className="p-2.5 bg-slate-50 border rounded flex justify-between items-center">
+                      <span className="text-slate-600">刮痕/碰傷 (Scratches)</span>
+                      <span className="font-bold text-emerald-700">0 處 (合格)</span>
+                    </div>
+                    <div className="p-2.5 bg-slate-50 border rounded flex justify-between items-center">
+                      <span className="text-slate-600">切削熱變色 (Discolor)</span>
+                      <span className="font-bold text-emerald-700">無變色 (合格)</span>
+                    </div>
+                  </div>
+
+                  {/* 檢驗判定大印章 */}
+                  <div className="p-4 rounded-lg bg-emerald-50 border-2 border-dashed border-emerald-500 flex items-center justify-between">
+                    <div className="space-y-1">
+                      <div className="text-xs text-emerald-900 font-mono font-bold">自動雷射序號打標</div>
+                      <div className="text-sm font-mono font-black text-emerald-800">
+                        SN: 2026-A109-0348-PASS
+                      </div>
+                      <div className="text-[11px] text-emerald-700">
+                        已連線 MES 系統歸檔，AGV-04 自動接駁運往恆溫品管立體倉庫。
+                      </div>
+                    </div>
+                    <div className="px-4 py-2 bg-emerald-600 text-white rounded font-black text-xl font-mono tracking-wider shadow-md transform -rotate-3 border border-emerald-400">
+                      QC PASS
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-500 font-mono text-right">
+                  檢驗時間戳記: {heartbeat.lastInspectionTime} · 檢驗員: Model宇宙 AI 視覺代理
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ============ F7 綠色能源與設備健康預測維護 ============ */}
+          <div className={view === "f7" ? "hh-card rounded-lg p-5 space-y-4" : "hidden hh-card rounded-lg p-5 space-y-4"}>
+            <div className="flex justify-between items-center border-b border-[#9aa3b4] pb-2">
+              <h2 className="text-base font-bold text-[#202731] flex items-center gap-2">
+                <i data-lucide="leaf" className="w-5 h-5 text-emerald-600" />
+                綠色能源管理 · ESG 碳排計算與設備預測性維護
+              </h2>
+              <div className="flex items-center gap-2 text-xs font-mono">
+                <span className="text-slate-600">廠務物聯網遙測</span>
+                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">
+                  ● ISO 50001 & ISO 14064
+                </span>
+              </div>
+            </div>
+
+            {/* 頂部四指標卡 */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+              <div className="p-3 bg-white rounded border border-slate-300 shadow-sm">
+                <div className="text-slate-500 font-semibold flex items-center gap-1">
+                  <i data-lucide="zap" className="w-3.5 h-3.5 text-amber-500" />
+                  全機即時總功率
+                </div>
+                <div className="text-xl font-bold text-slate-900 mt-0.5">{heartbeat.realtimePowerKW} kW</div>
+                <div className="text-[11px] text-slate-400 mt-1">主軸 18.2kW · 伺服 4.8kW</div>
+              </div>
+              <div className="p-3 bg-white rounded border border-slate-300 shadow-sm">
+                <div className="text-slate-500 font-semibold flex items-center gap-1">
+                  <i data-lucide="activity" className="w-3.5 h-3.5 text-blue-500" />
+                  當班累計耗電
+                </div>
+                <div className="text-xl font-bold text-blue-700 mt-0.5">{heartbeat.cumulativeKWh} kWh</div>
+                <div className="text-[11px] text-blue-600 mt-1">每秒即時跳錶計算</div>
+              </div>
+              <div className="p-3 bg-white rounded border border-slate-300 shadow-sm">
+                <div className="text-slate-500 font-semibold flex items-center gap-1">
+                  <i data-lucide="dollar-sign" className="w-3.5 h-3.5 text-emerald-600" />
+                  當班電費折算
+                </div>
+                <div className="text-xl font-bold text-emerald-700 mt-0.5">{heartbeat.electricityCostNTD} NTD</div>
+                <div className="text-[11px] text-slate-500 mt-1">約 ${heartbeat.electricityCostUSD} USD</div>
+              </div>
+              <div className="p-3 bg-white rounded border border-slate-300 shadow-sm">
+                <div className="text-slate-500 font-semibold flex items-center gap-1">
+                  <i data-lucide="globe" className="w-3.5 h-3.5 text-teal-600" />
+                  ESG 累計碳排放
+                </div>
+                <div className="text-xl font-bold text-teal-700 mt-0.5">{heartbeat.carbonKgCO2e} kg CO₂e</div>
+                <div className="text-[11px] text-teal-600 mt-1">單件 0.26 kg CO₂e / 件</div>
+              </div>
+            </div>
+
+            {/* 雙欄：左側能耗結構與太陽能綠電，右側預測性維護健康矩陣 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* 左側：能耗架構與太陽能綠電 */}
+              <div className="p-4 bg-white rounded border border-slate-300 space-y-3 shadow-sm">
+                <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                  <span className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+                    <i data-lucide="pie-chart" className="w-4 h-4 text-emerald-600" />
+                    全機能耗細部負載結構分析
+                  </span>
+                  <span className="text-[11px] font-mono text-emerald-700 font-bold">屋頂太陽能: {heartbeat.solarSelfSufficiency}%</span>
+                </div>
+
+                <div className="space-y-2 text-xs font-mono">
+                  <div>
+                    <div className="flex justify-between text-slate-700 mb-1">
+                      <span>主軸馬達旋轉驅動 (Spindle Motor)</span>
+                      <span className="font-bold">{heartbeat.spindlePowerKW} kW (64.1%)</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full bg-blue-600 rounded-full" style={{ width: "64.1%" }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-slate-700 mb-1">
+                      <span>五軸伺服進給系統 (5-Axis Servo Drives)</span>
+                      <span className="font-bold">{heartbeat.servoPowerKW} kW (16.9%)</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full bg-cyan-600 rounded-full" style={{ width: "16.9%" }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-slate-700 mb-1">
+                      <span>高壓冷卻泵與排屑機 (High-Pressure Pump)</span>
+                      <span className="font-bold">{heartbeat.pumpPowerKW} kW (12.3%)</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full bg-amber-500 rounded-full" style={{ width: "12.3%" }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-slate-700 mb-1">
+                      <span>工控機電、冷氣與輔助周邊 (Aux & Controls)</span>
+                      <span className="font-bold">{heartbeat.auxPowerKW} kW (6.7%)</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full bg-slate-400 rounded-full" style={{ width: "6.7%" }} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded text-xs text-emerald-900 font-mono space-y-1">
+                  <div className="font-bold">🌱 綠色永續智造指標 (ESG Sustainability)</div>
+                  <div className="text-[11px] leading-relaxed text-emerald-800">
+                    屋頂 250kW 太陽能光電自給率 <strong>{heartbeat.solarSelfSufficiency}%</strong>，當班減少碳排 33.6 kg CO₂e。符合歐盟 CBAM 碳邊境機制與 2026 工具機節能標章。
+                  </div>
+                </div>
+              </div>
+
+              {/* 右側：預測性維護健康矩陣 */}
+              <div className="p-4 bg-white rounded border border-slate-300 space-y-3 shadow-sm">
+                <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                  <span className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+                    <i data-lucide="shield-check" className="w-4 h-4 text-blue-600" />
+                    預測性維護健康矩陣 (Predictive Health Matrix)
+                  </span>
+                  <span className="text-[11px] font-mono text-slate-400">AI 震動頻譜 & 壽命預警</span>
+                </div>
+
+                <div className="space-y-3 text-xs font-mono">
+                  {/* 主軸軸承震動頻譜 */}
+                  <div className="p-2.5 bg-slate-50 border rounded space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-slate-800">主軸後軸承震動健康度</span>
+                      <span className="font-bold text-emerald-700">{heartbeat.spindleVibrationHealth}% (良好)</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${heartbeat.spindleVibrationHealth}%` }} />
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      ISO 10816 震動速度均方根值: <strong>0.82 mm/s</strong> (綠色優良區間 &lt;1.8 mm/s)。
+                    </div>
+                  </div>
+
+                  {/* 滾珠螺桿自動潤滑油槽 */}
+                  <div className="p-2.5 bg-slate-50 border rounded space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-slate-800">滾珠螺桿自動潤滑油槽</span>
+                      <span className="font-bold text-blue-700">{heartbeat.lubricationOilLevel}% (剩餘 2.1L)</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${heartbeat.lubricationOilLevel}%` }} />
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      預估可連續運轉 <strong>48 小時</strong>，建議後天早班前例行補充 Mobil Vactra No.2 導軌油。
+                    </div>
+                  </div>
+
+                  {/* 切削水箱冷卻液濃度 */}
+                  <div className="p-2.5 bg-slate-50 border rounded space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-slate-800">切削水箱冷卻液折光濃度</span>
+                      <span className="font-bold text-amber-700">{heartbeat.coolantBrix}% Brix (微偏低)</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                      <div className="h-full bg-amber-500 rounded-full" style={{ width: "70%" }} />
+                    </div>
+                    <div className="text-[11px] text-amber-800 font-semibold">
+                      標準基準 9.0% - 11.0%，目前 8.5%，建議下班前補充 5 公升水性抗磨切削油精。
+                    </div>
+                  </div>
+
+                  {/* 廠房空壓 */}
+                  <div className="p-2.5 bg-slate-50 border rounded flex justify-between items-center">
+                    <div>
+                      <div className="font-bold text-slate-800">廠房空壓總源壓力</div>
+                      <div className="text-[11px] text-slate-500">五軸換刀與打刀缸驅動氣源</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-emerald-700 text-sm">{heartbeat.airPressureMpa} MPa</div>
+                      <div className="text-[10px] text-emerald-600">正常標準 (0.60-0.70)</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </main>
 
-        {/* ============ 右側：F1–F6 軟鍵 ＋ Model宇宙 語音管家 ============ */}
+        {/* ============ 右側：F1–F7 軟鍵 ＋ F8 警報 ＋ Model宇宙 語音管家 ============ */}
         <aside className="w-full lg:w-72 flex flex-col gap-3">
           <div className="flex flex-col gap-2">
             <button type="button" onClick={() => switchTab("f1")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === "f1" ? " active" : ""}`}>
@@ -1658,8 +2138,16 @@ export default function Home() {
               <span className="font-mono text-sm">F5: AI 外部通訊錄明細</span>
               <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
             </button>
+            <button type="button" onClick={() => switchTab("f6")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === "f6" ? " active" : ""}`}>
+              <span className="font-mono text-sm">F6: 智能品檢與尺寸公差</span>
+              <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
+            </button>
+            <button type="button" onClick={() => switchTab("f7")} className={`hh-softkey py-3 px-3.5 rounded-lg text-left text-xs font-bold text-[#202731] flex justify-between items-center shadow-sm${view === "f7" ? " active" : ""}`}>
+              <span className="font-mono text-sm">F7: 綠色能源與設備健康</span>
+              <i data-lucide="chevron-right" className="w-4 h-4 text-slate-500" />
+            </button>
             <button type="button" onClick={clearAlarm} className="py-3 px-3.5 rounded-lg text-left text-xs font-bold bg-[#b71c1c] hover:bg-[#c62828] text-white border border-[#7f0000] shadow-md flex justify-between items-center transition">
-              <span className="font-mono text-sm font-bold">F6: 警報靜音 / 重置</span>
+              <span className="font-mono text-sm font-bold">F8: 警報靜音 / 重置</span>
               <i data-lucide="bell-off" className="w-4 h-4 text-rose-200" />
             </button>
           </div>
@@ -1853,6 +2341,34 @@ export default function Home() {
                 className="text-[10px] px-2 py-1 rounded bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-400 text-indigo-800 border border-indigo-200 font-semibold transition"
               >
                 📊 智慧戰情報告
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("查看最新品檢報告")}
+                className="text-[10px] px-2 py-1 rounded bg-purple-50 hover:bg-purple-100 hover:border-purple-400 text-purple-800 border border-purple-200 font-semibold transition"
+              >
+                🔬 最新品檢報告
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("工廠今天耗電多少")}
+                className="text-[10px] px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-400 text-emerald-800 border border-emerald-200 font-semibold transition"
+              >
+                ⚡ 廠房即時能耗
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("設備健康度如何")}
+                className="text-[10px] px-2 py-1 rounded bg-cyan-50 hover:bg-cyan-100 hover:border-cyan-400 text-cyan-800 border border-cyan-200 font-semibold transition"
+              >
+                🛡️ 設備預測健康
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("切換到工單 B202")}
+                className="text-[10px] px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 hover:border-blue-400 text-blue-800 border border-blue-200 font-semibold transition"
+              >
+                🔄 換切燃油閥體
               </button>
               <button
                 type="button"
