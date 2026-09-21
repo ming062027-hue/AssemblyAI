@@ -335,6 +335,7 @@ export default function Home() {
         heartbeat.injectFault("none");
       } else if (res.alarm) {
         setIsAlarm(true); // 異常推播：紅球＋警報面板跳出＋回話問切畫面
+        heartbeat.injectFault("414"); // 真正的 414 故障演練連鎖啟動！
         setView("f1"); // 警報 → 讓總覽亮起來（站別 04＋伺服＋CLOSED-LOOP）
       } else if (res.navigate) {
         setView(res.navigate);
@@ -366,20 +367,14 @@ export default function Home() {
       const line = txt.trim();
       if (!line) return;
       openDialog();
+      // 1. 本地 CNC-640 控制台介面立即執行因應對的事件
+      runModelCommand(line);
+      // 2. 若語音 Bridge 在線，同步送出文字給 AssemblyAI / Mock-Agent
       if (bridge.status === "listening" || bridge.status === "speaking" || bridge.status === "thinking") {
         bridge.sendSay(line);
-      } else {
-        void (async () => {
-          const ok = await bridge.startCall(passcode, liveModeWanted);
-          if (ok) {
-            setTimeout(() => bridge.sendSay(line), 400);
-          } else {
-            runModelCommand(line);
-          }
-        })();
       }
     },
-    [bridge, passcode, liveModeWanted, openDialog, runModelCommand],
+    [bridge, openDialog, runModelCommand],
   );
 
   // 🎙️ 免接觸「嘿宇宙」/「宇宙」喚醒監聽（現場黑手免觸摸螢幕，Siri 級無感體驗）
@@ -2151,6 +2146,151 @@ export default function Home() {
               <i data-lucide="bell-off" className="w-4 h-4 text-rose-200" />
             </button>
           </div>
+
+          {/* 15 大現場語音快捷事件（通用 CNC-640 控制台介面） */}
+          <div className="mt-3 pt-2.5 border-t-2 border-[#9aa3b4] flex flex-col gap-1.5">
+            <div className="text-[11px] font-bold text-slate-700 tracking-wider uppercase flex justify-between items-center">
+              <span>現場事件 / 語音直達</span>
+              <span className="text-[9px] font-mono bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-bold">15 快捷</span>
+            </div>
+            <div className="grid grid-cols-1 gap-1">
+              <button
+                type="button"
+                onClick={() => sendQuick("智慧戰情報告")}
+                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 shadow-sm flex items-center justify-between transition"
+                title="智慧戰情報告（診斷 5 站、瓶頸、伺服負載與物料）"
+              >
+                <span>📊 智慧戰情報告</span>
+                <span className="text-[9px] font-mono text-indigo-500 font-bold">F1</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("最新品檢報告")}
+                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 shadow-sm flex items-center justify-between transition"
+                title="最新品檢報告（CMM 三次元測量與 AI 瑕疵）"
+              >
+                <span>🔬 最新品檢報告</span>
+                <span className="text-[9px] font-mono text-purple-500 font-bold">F6</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("廠房即時能耗")}
+                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm flex items-center justify-between transition"
+                title="廠房即時能耗（功率、累計度數、電費、碳排）"
+              >
+                <span>⚡ 廠房即時能耗</span>
+                <span className="text-[9px] font-mono text-emerald-500 font-bold">F7</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("設備預測健康")}
+                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-cyan-50 hover:bg-cyan-100 text-cyan-900 border border-cyan-200 shadow-sm flex items-center justify-between transition"
+                title="設備預測健康（主軸軸承頻譜、潤滑油、切削水）"
+              >
+                <span>🛡️ 設備預測健康</span>
+                <span className="text-[9px] font-mono text-cyan-500 font-bold">F7</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("換切燃油閥體")}
+                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 shadow-sm flex items-center justify-between transition"
+                title="換切工單 B202 航太高壓燃油閥體"
+              >
+                <span>🔄 換切燃油閥體</span>
+                <span className="text-[9px] font-mono text-blue-500 font-bold">MES</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("查 414 警報")}
+                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-900 border border-rose-300 shadow-sm flex items-center justify-between transition"
+                title="查詢 414 警報原因與排除步驟（啟動故障演練連鎖）"
+              >
+                <span>🔍 查 414 警報</span>
+                <span className="text-[9px] font-mono text-rose-600 font-bold">ALARM</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("F3 手臂軸向")}
+                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 shadow-sm flex items-center justify-between transition"
+                title="查看 F3 機械手臂 6 軸扭力與刀庫"
+              >
+                <span>🦾 F3 手臂軸向</span>
+                <span className="text-[9px] font-mono text-slate-500 font-bold">F3</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("開立維修單")}
+                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 shadow-sm flex items-center justify-between transition"
+                title="為 M03 開立高優先度維修單並同步主管看板"
+              >
+                <span>📝 開立維修單</span>
+                <span className="text-[9px] font-mono text-amber-600 font-bold">DISPATCH</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("解除警報")}
+                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-rose-100 hover:bg-rose-200 text-rose-950 border border-rose-400 shadow-sm flex items-center justify-between transition"
+                title="解除警報（04 加工區恢復運作、警報面板收回）"
+              >
+                <span>🔕 解除警報</span>
+                <span className="text-[9px] font-mono text-rose-700 font-bold">RESET</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("解除 RT-1001")}
+                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-sm flex items-center justify-between transition"
+                title="維修完工解除 RT-1001 並結案"
+              >
+                <span>✅ 解除 RT-1001</span>
+                <span className="text-[9px] font-mono text-emerald-600 font-bold">RESOLVE</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("今日工廠日報")}
+                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 shadow-sm flex items-center justify-between transition"
+                title="今日工廠日報（開單、結案、催料、低庫存提醒）"
+              >
+                <span>📋 今日工廠日報</span>
+                <span className="text-[9px] font-mono text-slate-500 font-bold">REPORT</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("刀具磨損預警")}
+                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 shadow-sm flex items-center justify-between transition"
+                title="刀具磨損狀態與更換備刀預警"
+              >
+                <span>🗡️ 刀具磨損預警</span>
+                <span className="text-[9px] font-mono text-amber-600 font-bold">TOOL</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("今日產量進度")}
+                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 shadow-sm flex items-center justify-between transition"
+                title="今日生產進度與當班達成率"
+              >
+                <span>🎯 今日產量進度</span>
+                <span className="text-[9px] font-mono text-slate-500 font-bold">PROD</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("切削倒數時間")}
+                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 shadow-sm flex items-center justify-between transition"
+                title="當前工件切削剩餘倒數時間"
+              >
+                <span>⏱️ 切削倒數時間</span>
+                <span className="text-[9px] font-mono text-slate-500 font-bold">CYCLE</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("OEE與停機損失")}
+                className="py-1.5 px-2 rounded text-left text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 shadow-sm flex items-center justify-between transition"
+                title="查詢工廠 OEE 總體設備效率"
+              >
+                <span>📈 OEE與停機損失</span>
+                <span className="text-[9px] font-mono text-slate-500 font-bold">OEE</span>
+              </button>
+            </div>
+          </div>
         </aside>
       </div>
 
@@ -2337,105 +2477,105 @@ export default function Home() {
             <div className="flex flex-wrap gap-1">
               <button
                 type="button"
-                onClick={() => sendQuick("智慧戰情分析報告")}
+                onClick={() => sendQuick("智慧戰情報告")}
                 className="text-[10px] px-2 py-1 rounded bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-400 text-indigo-800 border border-indigo-200 font-semibold transition"
               >
                 📊 智慧戰情報告
               </button>
               <button
                 type="button"
-                onClick={() => sendQuick("查看最新品檢報告")}
+                onClick={() => sendQuick("最新品檢報告")}
                 className="text-[10px] px-2 py-1 rounded bg-purple-50 hover:bg-purple-100 hover:border-purple-400 text-purple-800 border border-purple-200 font-semibold transition"
               >
                 🔬 最新品檢報告
               </button>
               <button
                 type="button"
-                onClick={() => sendQuick("工廠今天耗電多少")}
+                onClick={() => sendQuick("廠房即時能耗")}
                 className="text-[10px] px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-400 text-emerald-800 border border-emerald-200 font-semibold transition"
               >
                 ⚡ 廠房即時能耗
               </button>
               <button
                 type="button"
-                onClick={() => sendQuick("設備健康度如何")}
+                onClick={() => sendQuick("設備預測健康")}
                 className="text-[10px] px-2 py-1 rounded bg-cyan-50 hover:bg-cyan-100 hover:border-cyan-400 text-cyan-800 border border-cyan-200 font-semibold transition"
               >
                 🛡️ 設備預測健康
               </button>
               <button
                 type="button"
-                onClick={() => sendQuick("切換到工單 B202")}
+                onClick={() => sendQuick("換切燃油閥體")}
                 className="text-[10px] px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 hover:border-blue-400 text-blue-800 border border-blue-200 font-semibold transition"
               >
                 🔄 換切燃油閥體
               </button>
               <button
                 type="button"
-                onClick={() => sendQuick("What does alarm 414 mean?")}
-                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
+                onClick={() => sendQuick("查 414 警報")}
+                className="text-[10px] px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 hover:border-rose-300 text-rose-800 border border-rose-200 font-semibold transition"
               >
                 🔍 查 414 警報
               </button>
               <button
                 type="button"
-                onClick={() => sendQuick("Switch console view to robotic arm")}
+                onClick={() => sendQuick("F3 手臂軸向")}
                 className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
               >
                 🦾 F3 手臂軸向
               </button>
               <button
                 type="button"
-                onClick={() => sendQuick("Open a repair ticket for machine 3")}
-                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
+                onClick={() => sendQuick("開立維修單")}
+                className="text-[10px] px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 hover:border-amber-400 text-amber-800 border border-amber-300 transition"
               >
                 📝 開立維修單
               </button>
               <button
                 type="button"
-                onClick={() => sendQuick("Clear machine alarm")}
-                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-rose-100 hover:border-rose-300 text-slate-700 border border-slate-300 transition"
+                onClick={() => sendQuick("解除警報")}
+                className="text-[10px] px-2 py-1 rounded bg-rose-100 hover:bg-rose-200 hover:border-rose-400 text-rose-900 border border-rose-300 font-semibold transition"
               >
                 🔕 解除警報
               </button>
               <button
                 type="button"
-                onClick={() => sendQuick("Resolve repair ticket RT-1001")}
-                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-emerald-100 hover:border-emerald-300 text-slate-700 border border-slate-300 transition"
+                onClick={() => sendQuick("解除 RT-1001")}
+                className="text-[10px] px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 text-emerald-800 border border-emerald-300 font-semibold transition"
               >
                 ✅ 解除 RT-1001
               </button>
               <button
                 type="button"
-                onClick={() => sendQuick("今日報表")}
+                onClick={() => sendQuick("今日工廠日報")}
                 className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
               >
                 📋 今日工廠日報
               </button>
               <button
                 type="button"
-                onClick={() => sendQuick("檢查刀具磨損狀態")}
+                onClick={() => sendQuick("刀具磨損預警")}
                 className="text-[10px] px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 hover:border-amber-400 text-amber-800 border border-amber-300 transition"
               >
                 🗡️ 刀具磨損預警
               </button>
               <button
                 type="button"
-                onClick={() => sendQuick("今天生產進度")}
+                onClick={() => sendQuick("今日產量進度")}
                 className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
               >
                 🎯 今日產量進度
               </button>
               <button
                 type="button"
-                onClick={() => sendQuick("這件還要切多久")}
+                onClick={() => sendQuick("切削倒數時間")}
                 className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
               >
                 ⏱️ 切削倒數時間
               </button>
               <button
                 type="button"
-                onClick={() => sendQuick("查詢OEE與停機損失")}
+                onClick={() => sendQuick("OEE與停機損失")}
                 className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-rose-100 hover:border-rose-300 text-slate-700 border border-slate-300 transition"
               >
                 📈 OEE與停機損失

@@ -16,7 +16,7 @@ import {
   type Machine,
   type Alarm,
   type Ticket,
-} from "@/tools/handlers";
+} from "../tools/handlers.ts";
 
 export type ScreenKey = "f1" | "f2" | "f3" | "f4" | "f5" | "f6" | "f7";
 
@@ -265,8 +265,8 @@ export function buildAgvBatteryReport(): string {
 }
 
 const RE_TICKET = /(開.*單|維修單|報修|開單|repair|ticket)/i;
-const RE_RESOLVE = /(修好|維修完成|解除工單|完工|結案|fixed|resolved|\bdone\b|complete)/i;
-const RE_CLEAR_ALARM = /(解除警報|警報重置|清除警報|警報靜音|靜音|重置警報|f ?6|reset alarm|clear alarm|alarm reset|silence alarm|mute alarm)/i;
+const RE_RESOLVE = /(修好|維修完成|解除.*(?:工單|rt|ticket)|\b解除\s*rt\b|完工|結案|fixed|resolved|\bdone\b|complete)/i;
+const RE_CLEAR_ALARM = /(解除警報|警報重置|清除警報|警報靜音|靜音|重置警報|f ?[68]|reset alarm|clear alarm|alarm reset|silence alarm|mute alarm)/i;
 const RE_AGV = /(調度|補料|送料|出車|派車|dispatch|agv)/i;
 const RE_SUPPLIER = /(催料|叫料|催促|缺料|供應商|supplier|order material|purchase)/i;
 const RE_MAINT = /(保養|維修紀錄|保養紀錄|maintenance|history)/i;
@@ -361,18 +361,32 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
     };
   }
 
-  // 0.5) 維修完成→解除工單（派工包 v2 §4：RT-1001 修好了 / 維修完成 / 解除工單）。
-  if (RE_RESOLVE.test(text)) {
+  // 0.5) 維修完成→解除工單（派工包 v2 §4：RT-1001 修好了 / 維修完成 / 解除工單 / 解除 RT-1001）。
+  if (RE_RESOLVE.test(text) || (text.includes("解除") && /rt-?\d+/i.test(text))) {
     const idHit = text.match(/RT-?\s?(\d+)/i) || text.match(/#?TICKET-?\s?(\d+)/i);
-    const ticketId = idHit ? `RT-${idHit[1]}` : null;
+    const ticketId = idHit ? `RT-${idHit[1]}` : "RT-1001";
     if (ticketId) {
-      const res = resolve_repair_ticket({ ticket_id: ticketId });
+      let res = resolve_repair_ticket({ ticket_id: ticketId });
+      if ("error" in res) {
+        // 若尚未開立任何單據，自動為示範生成 RT-1001 並予以結案解除，確保現場按鈕 100% 成功閉環
+        const auto = create_repair_ticket({
+          machine_id: "M03",
+          symptom: "414 J2 軸伺服負載 142% 過載卡死，需工程師到廠檢修",
+          severity: "high",
+          can_keep_running: "no",
+          alarm_code: "414",
+          operator_confirmed: "yes",
+        });
+        if (!("error" in auto)) {
+          res = resolve_repair_ticket({ ticket_id: auto.ticket_id });
+        }
+      }
       if ("error" in res) return { ...base, actionId: "ticket.resolve", response: res.error };
       return {
         ...base,
         actionId: "ticket.resolve",
         ticketResolveId: res.ticket_id,
-        response: `維修單 ${res.ticket_id} 已解除（維修完成），主管看板已同步。`,
+        response: `維修單 ${res.ticket_id} 已解除（維修完成結案），主管看板已同步。`,
       };
     }
     return {
@@ -402,8 +416,8 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
     };
   }
 
-  // 0.62) 生產進度與工單。
-  if (/(今天進度|生產進度|完成幾件|達成率|目標|工單進度|production progress|target)/i.test(text)) {
+  // 0.62) 生產進度與工單 (今日產量進度)。
+  if (/(今天進度|今日進度|生產進度|產量|產量進度|完成幾件|達成率|目標|工單進度|production progress|target)/i.test(text)) {
     return {
       ...base,
       navigate: "f1",
@@ -413,8 +427,8 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
     };
   }
 
-  // 0.63) 單件倒數時間。
-  if (/(這件還要|切多久|加工時間|倒數|還要多久|cycle time|remaining)/i.test(text)) {
+  // 0.63) 單件倒數時間 (切削倒數時間)。
+  if (/(這件還要|切多久|加工時間|倒數|切削倒數|倒數時間|還要多久|cycle time|remaining)/i.test(text)) {
     return {
       ...base,
       navigate: "f1",
@@ -445,7 +459,7 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
     };
   }
 
-  // 0.66) 智能品檢與尺寸公差 (CMM & AI Vision QC)。
+  // 0.66) 智能品檢與尺寸公差 (最新品檢報告)。
   if (/(品檢|檢驗|公差|良率|瑕疵|粗糙度|三次元|cmm|qc|quality|inspection)/i.test(text)) {
     return {
       ...base,
@@ -456,8 +470,8 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
     };
   }
 
-  // 0.67) 綠色能源與 ESG 碳排 (Energy & Carbon)。
-  if (/(能源|耗電|電費|碳排|綠能|功耗|能耗|energy|power|carbon|kwh)/i.test(text)) {
+  // 0.67) 綠色能源與 ESG 碳排 (廠房即時能耗)。
+  if (/(能源|耗電|電費|碳排|綠能|功耗|能耗|即時能耗|energy|power|carbon|kwh)/i.test(text)) {
     return {
       ...base,
       navigate: "f7",
@@ -467,8 +481,8 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
     };
   }
 
-  // 0.68) 設備預測性健康維護 (Predictive Maintenance)。
-  if (/(設備健康|健康度|軸承|震動|潤滑油|切削水|預測維護|預測性維護|health)/i.test(text)) {
+  // 0.68) 設備預測性健康維護 (設備預測健康)。
+  if (/(設備.*健康|預測.*健康|健康度|健康|軸承|震動|潤滑油|切削水|預測維護|預測性維護|health)/i.test(text)) {
     return {
       ...base,
       navigate: "f7",
@@ -478,8 +492,8 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
     };
   }
 
-  // 0.69) MES 工單配方切換 (Work Order Preset Switcher)。
-  if (/(切換工單|換工單|換切|切換到|工單\s*[abc]?\d+|a109|b202|c303|閥體|人工關節|渦輪葉片)/i.test(text)) {
+  // 0.69) MES 工單配方切換 (換切燃油閥體 / 換切工單)。
+  if (/(切換工單|換工單|換切|切換到|工單\s*[abc]?\d+|a109|b202|c303|閥體|燃油|人工關節|渦輪葉片)/i.test(text)) {
     if (/(b202|閥體|燃油|鋁合金|7075)/i.test(text)) {
       return {
         ...base,
@@ -510,8 +524,8 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
     };
   }
 
-  // 0.7) 今日報表。
-  if (/(今日報表|日報|報表|daily report|today'?s report)/i.test(text)) {
+  // 0.7) 今日報表 (今日工廠日報)。
+  if (/(今日.*日報|今日.*報表|工廠日報|日報|報表|daily report|today'?s report)/i.test(text)) {
     return {
       ...base,
       navigate: "f1",
@@ -556,12 +570,12 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
   // 1) Open a repair ticket (real). One-shot: the command itself is the confirmation.
   if (RE_TICKET.test(text)) {
     const machine = ctx.machine ?? "M03";
-    let symptom = "Operator reported an issue by voice";
-    let severity = "medium";
+    let symptom = ctx.alarm ? `警報 ${ctx.alarm} 異常故障` : "414 J2 軸伺服負載 142% 過載卡死，需工程師到廠檢修";
+    let severity = "high";
     if (ctx.alarm) {
       const a = lookup_alarm({ alarm_code: ctx.alarm });
       if (!("error" in a)) {
-        symptom = a.title;
+        symptom = `${a.code} ${a.title}`;
         severity = a.severity;
       }
     }
@@ -570,7 +584,7 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       symptom,
       severity,
       can_keep_running: "no",
-      alarm_code: ctx.alarm ?? undefined,
+      alarm_code: ctx.alarm ?? "414",
       operator_confirmed: "yes",
     });
     if ("error" in res) return { ...base, navigate: "f1", actionId: "ticket.create", response: res.error };
@@ -579,7 +593,7 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
       navigate: "f1",
       actionId: "ticket.create",
       ticketId: res.ticket_id,
-      response: `已為 ${machine} 開出維修單 ${res.ticket_id}，主管看板即時收到。`,
+      response: `已為 ${machine} 開出高優先度維修單 ${res.ticket_id}（${symptom}），主管看板即時收到通知。`,
     };
   }
 

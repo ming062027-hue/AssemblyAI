@@ -61,7 +61,7 @@ function route(text) {
     };
   }
 
-  if (lower.includes("resolve") || lower.includes("resolved") || lower.includes("clear ticket") || lower.includes("fixed")) {
+  if (lower.includes("resolve") || lower.includes("resolved") || lower.includes("clear ticket") || lower.includes("fixed") || (lower.includes("解除") && (lower.includes("rt") || lower.includes("1001") || lower.includes("工單")))) {
     const hit = lower.match(/rt-?\d{4}/i);
     const num = hit ? hit[0].replace(/[^0-9]/g, "") : "1001";
     const ticketId = `RT-${num}`;
@@ -73,12 +73,27 @@ function route(text) {
     };
   }
 
-  if (/\barms?\b|\btorque\b|\bf3\b|手臂/.test(lower)) {
+  if (lower.includes("開立維修單") || lower.includes("維修單") || lower.includes("開單") || lower.includes("報修") || lower.includes("open a ticket") || lower.includes("repair ticket")) {
+    return {
+      action: "create_ticket",
+      tool: "create_repair_ticket",
+      arguments: {
+        machine_id: "M03",
+        symptom: "414 J2 軸伺服負載 142% 過載卡死",
+        severity: "high",
+        can_keep_running: "no",
+        operator_confirmed: "yes",
+      },
+      agent: ["已為機台 M03 開立高優先度維修單（414 軸過載），主管看板已即時同步收到。"],
+    };
+  }
+
+  if (/\barms?\b|\btorque\b|\bf3\b|手臂|刀具|刀庫|磨損/.test(lower)) {
     return {
       action: "switch_view",
       tool: "switch_console_view",
       arguments: { view: "f3" },
-      agent: ["Switching console display to robotic arm torque telemetry."],
+      agent: ["Switching console display to robotic arm torque telemetry and tool wear monitoring."],
     };
   }
   if (/\bcoolant\b|\braw material\b|\bf4\b|庫存|切削液/.test(lower)) {
@@ -97,22 +112,6 @@ function route(text) {
       agent: ["Switching console display to AGV fleet dispatch."],
     };
   }
-  if (/\boverview\b|\bprocess\b|\bf1\b|總覽/.test(lower)) {
-    return {
-      action: "switch_view",
-      tool: "switch_console_view",
-      arguments: { view: "f1" },
-      agent: ["Switching console display to process overview."],
-    };
-  }
-  if (/\bshow tickets\b|\bf5\b|通訊/.test(lower)) {
-    return {
-      action: "switch_view",
-      tool: "switch_console_view",
-      arguments: { view: "f5" },
-      agent: ["Switching console display to repair tickets and external contacts."],
-    };
-  }
   if (/\bquality\b|\bcmm\b|\binspection\b|\bf6\b|品檢|公差|粗糙度/.test(lower)) {
     return {
       action: "switch_view",
@@ -121,12 +120,28 @@ function route(text) {
       agent: ["Switching console display to AI vision and CMM precision quality inspection."],
     };
   }
-  if (/\benergy\b|\bcarbon\b|\bhealth\b|\bf7\b|能源|耗電|電費|碳排|健康/.test(lower)) {
+  if (/\benergy\b|\bcarbon\b|\bhealth\b|\bf7\b|能源|能耗|耗電|電費|碳排|健康|預測健康/.test(lower)) {
     return {
       action: "switch_view",
       tool: "switch_console_view",
       arguments: { view: "f7" },
       agent: ["Switching console display to green energy telemetry and predictive machine health."],
+    };
+  }
+  if (/\boverview\b|\bprocess\b|\bf1\b|總覽|戰情|工單|閥體|產量|倒數|oee|日報|報表/.test(lower)) {
+    return {
+      action: "switch_view",
+      tool: "switch_console_view",
+      arguments: { view: "f1" },
+      agent: ["Switching console display to process overview and live factory operations."],
+    };
+  }
+  if (/\bshow tickets\b|\bf5\b|通訊/.test(lower)) {
+    return {
+      action: "switch_view",
+      tool: "switch_console_view",
+      arguments: { view: "f5" },
+      agent: ["Switching console display to repair tickets and external contacts."],
     };
   }
 
