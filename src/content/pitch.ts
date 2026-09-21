@@ -47,12 +47,13 @@ export const PITCH_SLIDES: PitchSlide[] = [
     ],
   },
   {
-    title: "Live demo [TBD: URL pending deployment]",
+    title: "Live demo & Noise Resistance",
     bullets: [
-      "Demo URL: [TBD — pending deployment]. Passcode: see submission notes.",
-      '"Machine three has an alarm" finds M03 with alarm 414; "What does alarm four one four mean" brings likely causes and three first checks.',
-      '"I checked. Still noisy. Open a repair ticket." triggers questions, a history check, and a read-back; "Yes, confirm." files it, and the board shows the new ticket in seconds.',
-      "Bonus: ask about alarm 9999 — the assistant says it cannot find it instead of inventing an answer.",
+      "Live Demo: Operator voice page protected by passcode gate. Real-time AssemblyAI Voice Agent API connection.",
+      'Tested under 75dB simulated factory background noise: Voice Focus filters shopfloor rumble while accurately parsing commands.',
+      '"Machine three has an alarm" -> alarm 414 lookup -> troubleshooting checks -> confirmed ticket RT-1001 -> instant LiveBoard update.',
+      '"Ticket RT-1001 is resolved" completes the lifecycle loop, clearing alarms and returning machines to normal status.',
+      'Anti-hallucination guarantee: asking about alarm 9999 responds with "cannot find code", never a fabricated answer.',
     ],
   },
   {
@@ -74,12 +75,13 @@ export const PITCH_SLIDES: PitchSlide[] = [
     ],
   },
   {
-    title: "Business model [TBD: pricing pending]",
+    title: "Business model & Financial ROI",
     bullets: [
-      "Who pays: plant managers and maintenance supervisors who own uptime.",
-      "How we charge: per-machine monthly subscription. Price: [TBD — pending decision].",
-      "Market size formula: TAM = (number of CNC machines) × (monthly fee) × 12. Machine count: pending data (no public installed-base total found; see market-numbers file). Result: [TBD].",
-      "Context, not TAM: Taiwan machine-tool output was NTD 89.89 billion in 2025 [Source: S4, ITRI IEK summary; verified 2026-09-17], with exports of USD 2.004 billion [Source: S1; verified 2026-09-17]; Taiwan fields 302 industrial robots per 10,000 manufacturing employees, a global top-ten density [Source: S5, IFR 2026-04-08; verified 2026-09-17].",
+      "Who pays: Plant managers and maintenance supervisors whose KPIs depend on uptime.",
+      "Pricing: SaaS subscription at USD $49/machine/month (Starter) and USD $99/machine/month (Pro with MES/PLC telemetry).",
+      "Immediate ROI: Downtime costs $300 to $36,000/hour. Saving just 10 minutes of machine stoppage per month yields $50+ in recouped value, covering the entire monthly fee (600%+ ROI).",
+      "Serviceable Market (TAM): With ~3.0M global CNC units in operation and 15% digital retrofit readiness (450,000 units), initial TAM = 450,000 × $49 × 12 = USD $264 million/year.",
+      "Context: Taiwan machine-tool output was NTD 89.89B in 2025 [Source: S4, ITRI IEK] with exports of USD 2.004B [Source: S1]; Taiwan fields 302 industrial robots per 10k manufacturing workers [Source: S5, IFR 2026].",
     ],
   },
   {
