@@ -1295,17 +1295,17 @@ export default function Home() {
                     <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-between">
                       <div>
                         <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center justify-between">
-                          <span className="flex items-center gap-1.5"><SubDot light="green" />A 碼頭進貨</span>
-                          <span className="text-[9px] font-mono text-emerald-700 font-bold bg-emerald-50 px-1 rounded">卸貨中</span>
+                          <span className="flex items-center gap-1.5"><SubDot light="green" />{langMode === "en" ? "Dock A" : "A 碼頭進貨"}</span>
+                          <span className="text-[9px] font-mono text-emerald-700 font-bold bg-emerald-50 px-1 rounded">{langMode === "en" ? "Unloading" : "卸貨中"}</span>
                         </div>
                         <div className="text-[10px] text-slate-600 leading-relaxed font-mono">
-                          司機 AA｜車牌 BBB-123<br />10:00 碼頭下貨<br />1 號 AGV 來下貨
+                          {langMode === "en" ? "Driver AA | Plate BBB-123" : "司機 AA｜車牌 BBB-123"}<br />{langMode === "en" ? "10:00 Dock Drop-off" : "10:00 碼頭下貨"}<br />{langMode === "en" ? "AGV-01 Unloading" : "1 號 AGV 來下貨"}
                         </div>
                       </div>
                       {/* 動態卸貨進度條 */}
                       <div className="mt-1.5 pt-1 border-t border-slate-200">
                         <div className="flex justify-between text-[9px] font-mono text-slate-500 mb-0.5">
-                          <span>卸載進度 (裝載AGV-01)</span>
+                          <span>{langMode === "en" ? "Unload Progress (AGV-01)" : "卸載進度 (裝載AGV-01)"}</span>
                           <span className="text-blue-700 font-bold">{heartbeat.dockAProgress}%</span>
                         </div>
                         <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
@@ -1319,16 +1319,16 @@ export default function Home() {
                     <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-between">
                       <div>
                         <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center justify-between">
-                          <span className="flex items-center gap-1.5"><SubDot light="green" />B 碼頭進貨</span>
-                          <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1 rounded">待命中</span>
+                          <span className="flex items-center gap-1.5"><SubDot light="green" />{langMode === "en" ? "Dock B" : "B 碼頭進貨"}</span>
+                          <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1 rounded">{langMode === "en" ? "Standby" : "待命中"}</span>
                         </div>
                         <div className="text-[10px] text-slate-600 leading-relaxed font-mono">
-                          司機 BB｜車牌 CCC-456<br />15:00 到碼頭<br />2 號 AGV 來下貨
+                          {langMode === "en" ? "Driver BB | Plate CCC-456" : "司機 BB｜車牌 CCC-456"}<br />{langMode === "en" ? "15:00 Dock Arrival" : "15:00 到碼頭"}<br />{langMode === "en" ? "AGV-02 Unloading" : "2 號 AGV 來下貨"}
                         </div>
                       </div>
                       <div className="mt-1 pt-1 border-t border-slate-200 text-[9px] text-slate-500 font-mono flex justify-between">
-                        <span>過磅狀態</span>
-                        <span className="text-emerald-700 font-bold">過磅完成</span>
+                        <span>{langMode === "en" ? "Weighing Status" : "過磅狀態"}</span>
+                        <span className="text-emerald-700 font-bold">{langMode === "en" ? "Weighed" : "過磅完成"}</span>
                       </div>
                     </div>
                   </div>
@@ -1349,18 +1349,18 @@ export default function Home() {
                     <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-between">
                       <div>
                         <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center justify-between">
-                          <span className="flex items-center gap-1.5"><SubDot light="blue" />1 號 AGV</span>
-                          <span className="text-[9px] font-mono text-blue-700 font-bold bg-blue-50 px-1 rounded animate-pulse">運送中</span>
+                          <span className="flex items-center gap-1.5"><SubDot light="blue" />{langMode === "en" ? "AGV-01" : "1 號 AGV"}</span>
+                          <span className="text-[9px] font-mono text-blue-700 font-bold bg-blue-50 px-1 rounded animate-pulse">{langMode === "en" ? "Transporting" : "運送中"}</span>
                         </div>
                         <div className="text-[10px] text-slate-600 leading-relaxed">
-                          確認司機車牌 · 碼頭<br />品名/數量/材質/供應商<br />
-                          <span className="font-mono font-bold text-slate-800">入庫 A 櫃 2-1</span>
+                          {langMode === "en" ? "Verify Plate · Dock" : "確認司機車牌 · 碼頭"}<br />{langMode === "en" ? "Item/Qty/Mat/Supplier" : "品名/數量/材質/供應商"}<br />
+                          <span className="font-mono font-bold text-slate-800">{langMode === "en" ? "Store to Rack A 2-1" : "入庫 A 櫃 2-1"}</span>
                         </div>
                       </div>
                       {/* 動態 AGV 搬運進度條 */}
                       <div className="mt-1.5 pt-1 border-t border-slate-200">
                         <div className="flex justify-between text-[9px] font-mono text-slate-500 mb-0.5">
-                          <span>碼頭A ➔ A櫃 2-1</span>
+                          <span>{langMode === "en" ? "Dock A ➔ Rack A 2-1" : "碼頭A ➔ A櫃 2-1"}</span>
                           <span className="text-blue-700 font-bold">{heartbeat.agv1Progress}%</span>
                         </div>
                         <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
@@ -1374,18 +1374,18 @@ export default function Home() {
                     <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-between">
                       <div>
                         <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center justify-between">
-                          <span className="flex items-center gap-1.5"><SubDot light="blue" />2 號 AGV</span>
-                          <span className="text-[9px] font-mono text-blue-700 font-bold bg-blue-50 px-1 rounded">運送中</span>
+                          <span className="flex items-center gap-1.5"><SubDot light="blue" />{langMode === "en" ? "AGV-02" : "2 號 AGV"}</span>
+                          <span className="text-[9px] font-mono text-blue-700 font-bold bg-blue-50 px-1 rounded">{langMode === "en" ? "Transporting" : "運送中"}</span>
                         </div>
                         <div className="text-[10px] text-slate-600 leading-relaxed">
-                          確認司機車牌 · 碼頭<br />品名/數量/材質/供應商<br />
-                          <span className="font-mono font-bold text-slate-800">入庫 B 櫃 1-1</span>
+                          {langMode === "en" ? "Verify Plate · Dock" : "確認司機車牌 · 碼頭"}<br />{langMode === "en" ? "Item/Qty/Mat/Supplier" : "品名/數量/材質/供應商"}<br />
+                          <span className="font-mono font-bold text-slate-800">{langMode === "en" ? "Store to Rack B 1-1" : "入庫 B 櫃 1-1"}</span>
                         </div>
                       </div>
                       {/* 動態 AGV 搬運進度條 */}
                       <div className="mt-1.5 pt-1 border-t border-slate-200">
                         <div className="flex justify-between text-[9px] font-mono text-slate-500 mb-0.5">
-                          <span>碼頭B ➔ B櫃 1-1</span>
+                          <span>{langMode === "en" ? "Dock B ➔ Rack B 1-1" : "碼頭B ➔ B櫃 1-1"}</span>
                           <span className="text-blue-700 font-bold">{heartbeat.agv2Progress}%</span>
                         </div>
                         <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
@@ -1414,19 +1414,19 @@ export default function Home() {
                     <div className="p-2 rounded bg-amber-50 border-2 border-amber-400 flex-1 flex flex-col justify-between shadow-sm">
                       <div>
                         <div className="text-[11px] font-bold text-amber-900 mb-1 flex items-center justify-between">
-                          <span className="flex items-center gap-1.5"><SubDot light="blue" />1 號手臂物料區 · 補料中</span>
-                          <span className="text-[9px] font-mono text-rose-700 font-bold bg-rose-50 px-1 rounded animate-pulse">急送中</span>
+                          <span className="flex items-center gap-1.5"><SubDot light="blue" />{langMode === "en" ? "Arm 1 Mat. Area · Refilling" : "1 號手臂物料區 · 補料中"}</span>
+                          <span className="text-[9px] font-mono text-rose-700 font-bold bg-rose-50 px-1 rounded animate-pulse">{langMode === "en" ? "Expedite" : "急送中"}</span>
                         </div>
                         <div className="text-[10px] text-slate-800 leading-relaxed">
-                          <span className="text-rose-700 font-black">低於下限 · 補貨</span><br />
-                          鋁鋼｜100 支｜S45C<br />
-                          <span className="font-mono font-bold text-slate-900">B 櫃 1-1</span>
+                          <span className="text-rose-700 font-black">{langMode === "en" ? "Below Min · Restock" : "低於下限 · 補貨"}</span><br />
+                          {langMode === "en" ? "Al-Steel | 100 Pcs | S45C" : "鋁鋼｜100 支｜S45C"}<br />
+                          <span className="font-mono font-bold text-slate-900">{langMode === "en" ? "Rack B 1-1" : "B 櫃 1-1"}</span>
                         </div>
                       </div>
                       {/* 動態補料進度條 */}
                       <div className="mt-1.5 pt-1 border-t border-amber-200">
                         <div className="flex justify-between text-[9px] font-mono text-amber-900 mb-0.5">
-                          <span>急件配送中 (預計28s)</span>
+                          <span>{langMode === "en" ? "Expedited Delivery (Est. 28s)" : "急件配送中 (預計28s)"}</span>
                           <span className="text-amber-800 font-bold">{heartbeat.feedDeliveryProgress}%</span>
                         </div>
                         <div className="w-full bg-amber-200 h-1.5 rounded-full overflow-hidden">
@@ -1440,16 +1440,16 @@ export default function Home() {
                     <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-between">
                       <div>
                         <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center justify-between">
-                          <span className="flex items-center gap-1.5"><SubDot light="amber" />2 號手臂物料區</span>
-                          <span className="text-[9px] font-mono text-emerald-700 bg-emerald-50 px-1 rounded font-bold">充沛</span>
+                          <span className="flex items-center gap-1.5"><SubDot light="amber" />{langMode === "en" ? "Arm 2 Mat. Area" : "2 號手臂物料區"}</span>
+                          <span className="text-[9px] font-mono text-emerald-700 bg-emerald-50 px-1 rounded font-bold">{langMode === "en" ? "Ample" : "充沛"}</span>
                         </div>
                         <div className="text-[10px] text-emerald-700 font-bold leading-relaxed">
-                          原料正常<br />待命中
+                          {langMode === "en" ? "Material OK" : "原料正常"}<br />{langMode === "en" ? "Standby" : "待命中"}
                         </div>
                       </div>
                       <div className="mt-1 pt-1 border-t border-slate-200 text-[9px] text-slate-500 font-mono flex justify-between">
-                        <span>目前庫存</span>
-                        <span className="text-emerald-700 font-bold">100% 滿足</span>
+                        <span>{langMode === "en" ? "Current Stock" : "目前庫存"}</span>
+                        <span className="text-emerald-700 font-bold">{langMode === "en" ? "100% Fulfilled" : "100% 滿足"}</span>
                       </div>
                     </div>
                   </div>
@@ -1480,15 +1480,15 @@ export default function Home() {
                     <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-between">
                       <div>
                         <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center justify-between">
-                          <span className="flex items-center gap-1.5"><SubDot light="green" />1 號機械手臂 · AE800</span>
-                          <span className="text-[9px] font-mono text-emerald-700 font-bold bg-emerald-50 px-1 rounded animate-pulse">切削中</span>
+                          <span className="flex items-center gap-1.5"><SubDot light="green" />{langMode === "en" ? "Robot 1 · AE800" : "1 號機械手臂 · AE800"}</span>
+                          <span className="text-[9px] font-mono text-emerald-700 font-bold bg-emerald-50 px-1 rounded animate-pulse">{langMode === "en" ? "Cutting" : "切削中"}</span>
                         </div>
-                        <div className="text-[10px] text-slate-600 leading-relaxed">物料區 › 自檢成品 › 成品區</div>
+                        <div className="text-[10px] text-slate-600 leading-relaxed">{langMode === "en" ? "Mat. Area › Self-Test › Outbound" : "物料區 › 自檢成品 › 成品區"}</div>
                       </div>
                       {/* 與真實 CNC 物理切削倒數連動 */}
                       <div className="mt-1.5 pt-1 border-t border-slate-200">
                         <div className="flex justify-between text-[9px] font-mono text-slate-500 mb-0.5">
-                          <span>五軸切削: {heartbeat.activeGCode.n}</span>
+                          <span>{langMode === "en" ? `5-Axis Cut: ${heartbeat.activeGCode.n}` : `五軸切削: ${heartbeat.activeGCode.n}`}</span>
                           <span className="text-blue-700 font-bold">{Math.round(((270 - heartbeat.cycleRemainSec) / 270) * 100)}%</span>
                         </div>
                         <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
@@ -1506,21 +1506,21 @@ export default function Home() {
                         <div className={`text-[11px] font-bold mb-1 flex items-center justify-between ${
                           isAlarm ? "text-rose-900" : "text-[#0056b3]"
                         }`}>
-                          <span className="flex items-center gap-1.5"><SubDot light={lights04[1]} />2 號機械手臂 · AF800{isAlarm ? "：E-402" : ""}</span>
+                          <span className="flex items-center gap-1.5"><SubDot light={lights04[1]} />{langMode === "en" ? "Robot 2 · AF800" : "2 號機械手臂 · AF800"}{isAlarm ? (langMode === "en" ? ": E-402" : "：E-402") : ""}</span>
                           <span className={`text-[9px] font-mono px-1 rounded font-bold ${
                             isAlarm ? "bg-rose-200 text-rose-900 animate-pulse" : "bg-slate-100 text-slate-600"
                           }`}>
-                            {isAlarm ? "伺服鎖定" : "自檢待命"}
+                            {isAlarm ? (langMode === "en" ? "Servo Lock" : "伺服鎖定") : (langMode === "en" ? "Standby Test" : "自檢待命")}
                           </span>
                         </div>
                         <div className={`text-[10px] leading-relaxed ${isAlarm ? "text-rose-700 font-bold" : "text-slate-600"}`}>
-                          {isAlarm ? "J2 伺服過載 142%" : "物料區 › 自檢成品 › 成品區"}
+                          {isAlarm ? (langMode === "en" ? "J2 Servo Overload 142%" : "J2 伺服過載 142%") : (langMode === "en" ? "Mat. Area › Self-Test › Outbound" : "物料區 › 自檢成品 › 成品區")}
                         </div>
                       </div>
                       <div className="mt-1 pt-1 border-t border-slate-200 text-[9px] text-slate-500 font-mono flex justify-between">
-                        <span>運作狀態</span>
+                        <span>{langMode === "en" ? "Run Status" : "運作狀態"}</span>
                         <span className={isAlarm ? "text-rose-700 font-bold" : "text-emerald-700 font-bold"}>
-                          {isAlarm ? "連鎖煞車觸發" : "正常"}
+                          {isAlarm ? (langMode === "en" ? "Interlock Brake Trig." : "連鎖煞車觸發") : (langMode === "en" ? "Normal" : "正常")}
                         </span>
                       </div>
                     </div>
@@ -1542,15 +1542,15 @@ export default function Home() {
                     <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-between">
                       <div>
                         <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center justify-between">
-                          <span className="flex items-center gap-1.5"><SubDot light="green" />3 號 AGV · 1 號手臂</span>
-                          <span className="text-[9px] font-mono text-emerald-700 font-bold bg-emerald-50 px-1 rounded animate-pulse">送檢中</span>
+                          <span className="flex items-center gap-1.5"><SubDot light="green" />{langMode === "en" ? "AGV-03 · Robot 1" : "3 號 AGV · 1 號手臂"}</span>
+                          <span className="text-[9px] font-mono text-emerald-700 font-bold bg-emerald-50 px-1 rounded animate-pulse">{langMode === "en" ? "Routing" : "送檢中"}</span>
                         </div>
-                        <div className="text-[10px] text-slate-600 leading-relaxed">成品區搬運 › 品檢區</div>
+                        <div className="text-[10px] text-slate-600 leading-relaxed">{langMode === "en" ? "Outbound › QC Area" : "成品區搬運 › 品檢區"}</div>
                       </div>
                       {/* 動態送檢進度條 */}
                       <div className="mt-1.5 pt-1 border-t border-slate-200">
                         <div className="flex justify-between text-[9px] font-mono text-slate-500 mb-0.5">
-                          <span>成品送檢: Part #{heartbeat.partsToday}</span>
+                          <span>{langMode === "en" ? `QC Routing: Part #${heartbeat.partsToday}` : `成品送檢: Part #${heartbeat.partsToday}`}</span>
                           <span className="text-emerald-700 font-bold">{heartbeat.qcDeliveryProgress}%</span>
                         </div>
                         <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
@@ -1564,14 +1564,14 @@ export default function Home() {
                     <div className="p-2 rounded bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-between">
                       <div>
                         <div className="text-[11px] font-bold text-[#0056b3] mb-1 flex items-center justify-between">
-                          <span className="flex items-center gap-1.5"><SubDot light="green" />4 號 AGV · 2 號手臂</span>
-                          <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1 rounded">待命</span>
+                          <span className="flex items-center gap-1.5"><SubDot light="green" />{langMode === "en" ? "AGV-04 · Robot 2" : "4 號 AGV · 2 號手臂"}</span>
+                          <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1 rounded">{langMode === "en" ? "Standby" : "待命"}</span>
                         </div>
-                        <div className="text-[10px] text-slate-600 leading-relaxed">成品區搬運 › 品檢區</div>
+                        <div className="text-[10px] text-slate-600 leading-relaxed">{langMode === "en" ? "Outbound › QC Area" : "成品區搬運 › 品檢區"}</div>
                       </div>
                       <div className="mt-1 pt-1 border-t border-slate-200 text-[9px] text-slate-500 font-mono flex justify-between">
-                        <span>品檢三次元</span>
-                        <span className="text-emerald-700 font-bold">校正就緒</span>
+                        <span>{langMode === "en" ? "CMM Calibration" : "品檢三次元"}</span>
+                        <span className="text-emerald-700 font-bold">{langMode === "en" ? "Ready" : "校正就緒"}</span>
                       </div>
                     </div>
                   </div>
@@ -1641,7 +1641,7 @@ export default function Home() {
                             <span>{item.code}</span>
                           </div>
                           <span className={`text-[10px] ${isActive ? "text-emerald-300 font-semibold" : "text-slate-500"}`}>
-                            {item.comment} {isActive ? "◄" : ""}
+                            {langMode === "en" ? (item.commentEn || item.comment) : item.comment} {isActive ? "◄" : ""}
                           </span>
                         </div>
                       );

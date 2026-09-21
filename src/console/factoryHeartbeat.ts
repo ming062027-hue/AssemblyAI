@@ -17,6 +17,7 @@ export interface GCodeBlock {
   n: string;
   code: string;
   comment: string;
+  commentEn?: string;
   f: number;
   s: number;
 }
@@ -36,37 +37,37 @@ export interface WorkOrderConfig {
 
 // 航太發動機渦輪葉片 (Ti-6Al-4V 鈦合金)
 export const GCODE_STREAM_A109: GCodeBlock[] = [
-  { n: "N0415", code: "TOOL CALL 3 Z S8500 F1200", comment: "換刀 T03 精銑球刀 R4", f: 1200, s: 8500 },
-  { n: "N0416", code: "M03 S8500 M08", comment: "主軸順時針啟動 + 高壓冷卻噴射", f: 1200, s: 8500 },
-  { n: "N0417", code: "G00 X+120.450 Y-45.200 Z+50.000", comment: "快速定位至葉根進刀安全點", f: 0, s: 8500 },
-  { n: "N0418", code: "G01 Z-12.500 F800", comment: "Z 軸切入航太渦輪葉片型面", f: 800, s: 8500 },
-  { n: "N0419", code: "G01 X+145.230 Y-82.110 F1200", comment: "葉片前緣曲面高速精銑", f: 1200, s: 8500 },
-  { n: "N0420", code: "G02 X+160.000 Y-65.000 I+15.0 J0 F1200", comment: "R15 圓弧螺旋插補輪廓", f: 1200, s: 8500 },
-  { n: "N0421", code: "G01 X+185.500 Y-65.000 F1500", comment: "尾緣流道微米級平滑修光", f: 1500, s: 8500 },
-  { n: "N0422", code: "G03 X+210.000 Y-40.000 I0 J+25.0 F1200", comment: "葉根圓角微細切削", f: 1200, s: 8500 },
-  { n: "N0423", code: "G01 Z+50.000 FMAX M09", comment: "高速退刀至換件安全平面", f: 3000, s: 8500 },
-  { n: "N0424", code: "M00 (CHECK WORKPIECE SURFACE)", comment: "自動中停：三次元雷射掃描表面", f: 0, s: 0 },
+  { n: "N0415", code: "TOOL CALL 3 Z S8500 F1200", comment: "換刀 T03 精銑球刀 R4", commentEn: "Tool Change T03 Ball Endmill R4", f: 1200, s: 8500 },
+  { n: "N0416", code: "M03 S8500 M08", comment: "主軸順時針啟動 + 高壓冷卻噴射", commentEn: "Spindle CW Start + High Pressure Coolant", f: 1200, s: 8500 },
+  { n: "N0417", code: "G00 X+120.450 Y-45.200 Z+50.000", comment: "快速定位至葉根進刀安全點", commentEn: "Rapid Traverse to Root Clearance", f: 0, s: 8500 },
+  { n: "N0418", code: "G01 Z-12.500 F800", comment: "Z 軸切入航太渦輪葉片型面", commentEn: "Z-Axis Profile Plunge", f: 800, s: 8500 },
+  { n: "N0419", code: "G01 X+145.230 Y-82.110 F1200", comment: "葉片前緣曲面高速精銑", commentEn: "Leading Edge High Speed Finishing", f: 1200, s: 8500 },
+  { n: "N0420", code: "G02 X+160.000 Y-65.000 I+15.0 J0 F1200", comment: "R15 圓弧螺旋插補輪廓", commentEn: "R15 Helical Interpolation", f: 1200, s: 8500 },
+  { n: "N0421", code: "G01 X+185.500 Y-65.000 F1500", comment: "尾緣流道微米級平滑修光", commentEn: "Trailing Edge Micron-level Polishing", f: 1500, s: 8500 },
+  { n: "N0422", code: "G03 X+210.000 Y-40.000 I0 J+25.0 F1200", comment: "葉根圓角微細切削", commentEn: "Root Fillet Fine Cutting", f: 1200, s: 8500 },
+  { n: "N0423", code: "G01 Z+50.000 FMAX M09", comment: "高速退刀至換件安全平面", commentEn: "High-Speed Retract to Clearance Plane", f: 3000, s: 8500 },
+  { n: "N0424", code: "M00 (CHECK WORKPIECE SURFACE)", comment: "自動中停：三次元雷射掃描表面", commentEn: "Auto Stop: 3D Laser Surface Scan", f: 0, s: 0 },
 ];
 
 // 航太高壓燃油閥體 (AL7075-T6 航太鋁合金)
 export const GCODE_STREAM_B202: GCodeBlock[] = [
-  { n: "N0101", code: "TOOL CALL 2 Z S12000 F2400", comment: "換刀 T02 粗銑刀 Ø16 鋁合金專用", f: 2400, s: 12000 },
-  { n: "N0102", code: "M03 S12000 M08 M07", comment: "主軸 12000 RPM + 高壓雙噴射冷卻", f: 2400, s: 12000 },
-  { n: "N0103", code: "G00 X+85.000 Y+60.000 Z+25.000", comment: "定位至燃油腔體主銑削基準點", f: 0, s: 12000 },
-  { n: "N0104", code: "G01 Z-28.000 F1600", comment: "螺旋下刀進給開粗主閥腔", f: 1600, s: 12000 },
-  { n: "N0105", code: "G02 X+115.000 Y+60.000 I+15.0 J0 F2400", comment: "內腔高精度圓形型腔粗銑", f: 2400, s: 12000 },
-  { n: "N0106", code: "G01 X+135.000 Y+85.000 F2200", comment: "高壓油道交叉油孔銑削", f: 2200, s: 12000 },
-  { n: "N0107", code: "G00 Z+50.000 M09", comment: "安全退刀更換精修螺紋刀", f: 4000, s: 12000 },
+  { n: "N0101", code: "TOOL CALL 2 Z S12000 F2400", comment: "換刀 T02 粗銑刀 Ø16 鋁合金專用", commentEn: "Tool Change T02 Rough Endmill Ø16", f: 2400, s: 12000 },
+  { n: "N0102", code: "M03 S12000 M08 M07", comment: "主軸 12000 RPM + 高壓雙噴射冷卻", commentEn: "Spindle 12000 RPM + Dual Coolant", f: 2400, s: 12000 },
+  { n: "N0103", code: "G00 X+85.000 Y+60.000 Z+25.000", comment: "定位至燃油腔體主銑削基準點", commentEn: "Position to Fuel Cavity Datum", f: 0, s: 12000 },
+  { n: "N0104", code: "G01 Z-28.000 F1600", comment: "螺旋下刀進給開粗主閥腔", commentEn: "Helical Plunge Roughing Main Cavity", f: 1600, s: 12000 },
+  { n: "N0105", code: "G02 X+115.000 Y+60.000 I+15.0 J0 F2400", comment: "內腔高精度圓形型腔粗銑", commentEn: "Inner Cavity High-Precision Roughing", f: 2400, s: 12000 },
+  { n: "N0106", code: "G01 X+135.000 Y+85.000 F2200", comment: "高壓油道交叉油孔銑削", commentEn: "Cross Hole Milling for Oil Gallery", f: 2200, s: 12000 },
+  { n: "N0107", code: "G00 Z+50.000 M09", comment: "安全退刀更換精修螺紋刀", commentEn: "Retract for Thread Mill Change", f: 4000, s: 12000 },
 ];
 
 // 醫療級人工髖關節球體 (SUS316L 醫療不鏽鋼)
 export const GCODE_STREAM_C303: GCodeBlock[] = [
-  { n: "N0201", code: "TOOL CALL 1 Z S6800 F900", comment: "換刀 T01 面銑刀 Ø50 球面精密銑", f: 900, s: 6800 },
-  { n: "N0202", code: "M03 S6800 M08", comment: "主軸啟動 6800 RPM + 奈米微量潤滑", f: 900, s: 6800 },
-  { n: "N0203", code: "G00 X+0.000 Y+0.000 Z+30.000", comment: "對準人工髖關節球體頂點法向", f: 0, s: 6800 },
-  { n: "N0204", code: "G01 Z-5.000 F450", comment: "不鏽鋼球面微量進給接觸", f: 450, s: 6800 },
-  { n: "N0205", code: "G03 X+45.000 Y+0.000 CR=28.000 F900", comment: "多軸聯動連續球弧插補", f: 900, s: 6800 },
-  { n: "N0206", code: "G01 Z+60.000 FMAX", comment: "超光學級退刀保護工件表面", f: 2500, s: 6800 },
+  { n: "N0201", code: "TOOL CALL 1 Z S6800 F900", comment: "換刀 T01 面銑刀 Ø50 球面精密銑", commentEn: "Tool Change T01 Face Mill Ø50", f: 900, s: 6800 },
+  { n: "N0202", code: "M03 S6800 M08", comment: "主軸啟動 6800 RPM + 奈米微量潤滑", commentEn: "Spindle 6800 RPM + Nano MQL", f: 900, s: 6800 },
+  { n: "N0203", code: "G00 X+0.000 Y+0.000 Z+30.000", comment: "對準人工髖關節球體頂點法向", commentEn: "Align to Hip Joint Sphere Apex", f: 0, s: 6800 },
+  { n: "N0204", code: "G01 Z-5.000 F450", comment: "不鏽鋼球面微量進給接觸", commentEn: "Stainless Steel Sphere Micro Feed", f: 450, s: 6800 },
+  { n: "N0205", code: "G03 X+45.000 Y+0.000 CR=28.000 F900", comment: "多軸聯動連續球弧插補", commentEn: "Multi-axis Continuous Arc Interpolation", f: 900, s: 6800 },
+  { n: "N0206", code: "G01 Z+60.000 FMAX", comment: "超光學級退刀保護工件表面", commentEn: "Optical Grade Retract to Protect Surface", f: 2500, s: 6800 },
 ];
 
 export const WORK_ORDERS: Record<"A109" | "B202" | "C303", WorkOrderConfig> = {
