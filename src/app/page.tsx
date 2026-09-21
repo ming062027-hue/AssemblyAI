@@ -362,6 +362,21 @@ function supplierName(code: string): string {
   return "S45C 圓棒材";
 }
 
+// 智慧格式化工單症狀，支援中英切換（包含既有與歷史工單）
+function formatSymptom(symptom: string, lang: "zh" | "en"): string {
+  if (lang !== "en") return symptom;
+  if (symptom.includes("414 J2 軸伺服負載 142% 過載卡死") || symptom.includes("需工程師到廠檢修")) {
+    return "414 J2 servo load 142% overload stall, field engineer inspection required";
+  }
+  if (symptom.includes("414 軸過載") || symptom.includes("警報 414")) {
+    return "Alarm 414 Axis Overload Stall";
+  }
+  if (symptom.includes("異常故障")) {
+    return symptom.replace(/警報\s*(\w+)\s*異常故障/, "Alarm $1 Fault");
+  }
+  return symptom;
+}
+
 // 瀏覽器內建語音辨識（webkitSpeechRecognition）沒有內建 TS 型別，這裡給最小型別。
 type SpeechRec = {
   lang: string;
@@ -1650,7 +1665,9 @@ export default function Home() {
                     <div className="text-xl font-black text-slate-800 my-1">
                       {heartbeat.spindleRpm} <span className="text-xs font-normal text-slate-500">RPM</span>
                     </div>
-                    <div className="text-[10px] text-slate-500">目標設定: 8,500 RPM</div>
+                    <div className="text-[10px] text-slate-500">
+                      {langMode === "en" ? "Target Set: 8,500 RPM" : "目標設定: 8,500 RPM"}
+                    </div>
                   </div>
 
                   {/* 主軸負載 */}
@@ -1683,7 +1700,9 @@ export default function Home() {
                     <div className="text-xl font-black text-slate-800 my-1">
                       {heartbeat.feedRateActual} <span className="text-xs font-normal text-slate-500">mm/min</span>
                     </div>
-                    <div className="text-[10px] text-slate-500">伺服響應: 0.8ms</div>
+                    <div className="text-[10px] text-slate-500">
+                      {langMode === "en" ? "Servo Response: 0.8ms" : "伺服響應: 0.8ms"}
+                    </div>
                   </div>
 
                   {/* 切削液壓力 */}
@@ -1695,7 +1714,9 @@ export default function Home() {
                     <div className="text-xl font-black text-slate-800 my-1">
                       {heartbeat.coolantPressureBar} <span className="text-xs font-normal text-slate-500">BAR</span>
                     </div>
-                    <div className="text-[10px] text-slate-500">過濾精度: 10µm</div>
+                    <div className="text-[10px] text-slate-500">
+                      {langMode === "en" ? "Filter Rating: 10µm" : "過濾精度: 10µm"}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1706,22 +1727,29 @@ export default function Home() {
               <div className="flex justify-between items-center pb-2 mb-2 border-b border-[#9aa3b4]">
                 <h2 className="text-sm font-bold text-[#202731] flex items-center gap-2">
                   <i data-lucide="clipboard-list" className="w-4 h-4 text-[#0056b3]" />
-                  語音開單即時看板
+                  {langMode === "en" ? "Voice Work Orders Live Kanban" : "語音開單即時看板"}
                 </h2>
                 <span className="text-xs font-mono font-semibold text-slate-600">
-                  {openCount} 待修＋{resolvedCount} 已完成
+                  {openCount} {langMode === "en" ? "Pending + " : "待修＋"}{resolvedCount} {langMode === "en" ? "Resolved" : "已完成"}
                 </span>
               </div>
               {latestTickets.length === 0 ? (
                 <div className="text-center text-slate-500 text-xs py-3 font-mono">
-                  等待語音開單…　跟 Model宇宙 說「開維修單」試試
+                  {langMode === "en"
+                    ? "Waiting for voice tickets... Say 'Issue work order' to MODEL Universe"
+                    : "等待語音開單…　跟 Model宇宙 說「開維修單」試試"}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left">
                     <thead className="bg-slate-100 border-b font-mono text-slate-600">
                       <tr>
-                        <th className="p-2">工單</th><th className="p-2">機台</th><th className="p-2">症狀</th><th className="p-2">嚴重度</th><th className="p-2">狀態</th><th className="p-2">時間</th>
+                        <th className="p-2">{langMode === "en" ? "Ticket #" : "工單"}</th>
+                        <th className="p-2">{langMode === "en" ? "Machine" : "機台"}</th>
+                        <th className="p-2">{langMode === "en" ? "Symptom" : "症狀"}</th>
+                        <th className="p-2">{langMode === "en" ? "Severity" : "嚴重度"}</th>
+                        <th className="p-2">{langMode === "en" ? "Status" : "狀態"}</th>
+                        <th className="p-2">{langMode === "en" ? "Time" : "時間"}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
@@ -1731,20 +1759,22 @@ export default function Home() {
                           <tr key={t.ticket_id} className={done ? "bg-emerald-50/60" : undefined}>
                             <td className="p-2 font-mono font-bold text-[#0056b3]">{t.ticket_id}</td>
                             <td className="p-2 font-mono">{t.machine_id}</td>
-                            <td className="p-2">{t.symptom}</td>
+                            <td className="p-2">{formatSymptom(t.symptom, langMode)}</td>
                             <td className="p-2 text-amber-700 font-bold">{t.severity}</td>
                             <td className="p-2">
                               {done ? (
                                 <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300">
-                                  已完成
+                                  {langMode === "en" ? "RESOLVED" : "已完成"}
                                 </span>
                               ) : (
                                 <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-300">
-                                  待修
+                                  {langMode === "en" ? "OPEN" : "待修"}
                                 </span>
                               )}
                             </td>
-                            <td className="p-2 font-mono text-slate-500">{new Date(t.created_at).toLocaleTimeString("zh-TW", { hour12: false })}</td>
+                            <td className="p-2 font-mono text-slate-500">
+                              {new Date(t.created_at).toLocaleTimeString(langMode === "en" ? "en-US" : "zh-TW", { hour12: false })}
+                            </td>
                           </tr>
                         );
                       })}
@@ -1760,27 +1790,46 @@ export default function Home() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <section className="hh-card rounded-lg p-4 font-mono text-xs space-y-2">
                   <div className="font-bold border-b border-[#9aa3b4] pb-1 flex justify-between">
-                    <span>伺服軸即時監控 (ROBOT-02)</span>
-                    <span className="text-rose-600 font-bold">E-402 警報中</span>
+                    <span>{langMode === "en" ? "Servo Joint Telemetry (ROBOT-02)" : "伺服軸即時監控 (ROBOT-02)"}</span>
+                    <span className="text-rose-600 font-bold">
+                      {langMode === "en" ? "E-402 ALARM ACTIVE" : "E-402 警報中"}
+                    </span>
                   </div>
-                  <div className="flex justify-between p-1.5 bg-white rounded border"><span>J1 BASE:</span><span>+124.500 mm (32%)</span></div>
+                  <div className="flex justify-between p-1.5 bg-white rounded border">
+                    <span>J1 BASE:</span><span>+124.500 mm (32%)</span>
+                  </div>
                   <div className="flex justify-between p-1.5 bg-rose-100 rounded border border-rose-400 font-bold text-rose-900">
-                    <span>J2 SHOULDER:</span><span>-48.210 mm (142% 超載)</span>
+                    <span>J2 SHOULDER:</span>
+                    <span>{langMode === "en" ? "-48.210 mm (142% OVERLOAD)" : "-48.210 mm (142% 超載)"}</span>
                   </div>
-                  <div className="flex justify-between p-1.5 bg-white rounded border"><span>J3 ELBOW:</span><span>+982.015 mm (28%)</span></div>
+                  <div className="flex justify-between p-1.5 bg-white rounded border">
+                    <span>J3 ELBOW:</span><span>+982.015 mm (28%)</span>
+                  </div>
                 </section>
                 <section className="hh-card rounded-lg p-4 text-xs font-sans space-y-2">
                   <div className="font-bold border-b border-[#9aa3b4] pb-1 flex justify-between">
-                    <span>AI 大腦最新自主行動摘要</span>
+                    <span>{langMode === "en" ? "AI Autonomous Action Feed" : "AI 大腦最新自主行動摘要"}</span>
                     <span className="text-emerald-700 font-mono font-bold">CLOSED-LOOP</span>
                   </div>
                   <div className="p-2 bg-white rounded border border-slate-300">
-                    <div className="text-rose-700 font-bold text-[11px]">● 已致電原廠報修 (13:10:15)</div>
-                    <div className="text-[11px] text-slate-700 mt-0.5">預約工程師今日 15:00 到廠排查 J2 軸卡料。</div>
+                    <div className="text-rose-700 font-bold text-[11px]">
+                      {langMode === "en" ? "● Called OEM Repair Service (13:10:15)" : "● 已致電原廠報修 (13:10:15)"}
+                    </div>
+                    <div className="text-[11px] text-slate-700 mt-0.5">
+                      {langMode === "en"
+                        ? "Booked field engineer today at 15:00 to inspect J2 axis mechanical stall."
+                        : "預約工程師今日 15:00 到廠排查 J2 軸卡料。"}
+                    </div>
                   </div>
                   <div className="p-2 bg-white rounded border border-slate-300">
-                    <div className="text-amber-800 font-bold text-[11px]">● 已致電材料供應商 (12:45:00)</div>
-                    <div className="text-[11px] text-slate-700 mt-0.5">S45C 鋼材庫存偏低，自動叫料 200 支，明日 09:00 前送達。</div>
+                    <div className="text-amber-800 font-bold text-[11px]">
+                      {langMode === "en" ? "● Called Material Supplier (12:45:00)" : "● 已致電材料供應商 (12:45:00)"}
+                    </div>
+                    <div className="text-[11px] text-slate-700 mt-0.5">
+                      {langMode === "en"
+                        ? "S45C steel bar inventory low. Auto-ordered 200 pcs, arriving tomorrow before 09:00."
+                        : "S45C 鋼材庫存偏低，自動叫料 200 支，明日 09:00 前送達。"}
+                    </div>
                   </div>
                 </section>
               </div>

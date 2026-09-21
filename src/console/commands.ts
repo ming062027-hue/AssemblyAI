@@ -458,7 +458,9 @@ export function interpret(
         // 若尚未開立任何單據，自動為示範生成 RT-1001 並予以結案解除，確保現場按鈕 100% 成功閉環
         const auto = create_repair_ticket({
           machine_id: "M03",
-          symptom: "414 J2 軸伺服負載 142% 過載卡死，需工程師到廠檢修",
+          symptom: en
+            ? "414 J2 servo load 142% overload stall, field engineer inspection required"
+            : "414 J2 軸伺服負載 142% 過載卡死，需工程師到廠檢修",
           severity: "high",
           can_keep_running: "no",
           alarm_code: "414",
@@ -680,12 +682,14 @@ export function interpret(
   // 1) Open a repair ticket (real). One-shot: the command itself is the confirmation.
   if (RE_TICKET.test(text)) {
     const machine = ctx.machine ?? "M03";
-    let symptom = ctx.alarm ? `警報 ${ctx.alarm} 異常故障` : "414 J2 軸伺服負載 142% 過載卡死，需工程師到廠檢修";
+    let symptom = en
+      ? (ctx.alarm ? `Alarm ${ctx.alarm} axis fault` : "414 J2 servo load 142% overload stall, field engineer inspection required")
+      : (ctx.alarm ? `警報 ${ctx.alarm} 異常故障` : "414 J2 軸伺服負載 142% 過載卡死，需工程師到廠檢修");
     let severity = "high";
     if (ctx.alarm) {
       const a = lookup_alarm({ alarm_code: ctx.alarm });
       if (!("error" in a)) {
-        symptom = `${a.code} ${a.title}`;
+        symptom = en ? `${a.code} Axis Overload Stall` : `${a.code} ${a.title}`;
         severity = a.severity;
       }
     }
