@@ -42,18 +42,24 @@ import {
   get_machine_status,
   get_maintenance_history,
   lookup_alarm,
+  resolve_repair_ticket,
 } from "@/tools/handlers";
+import {
+  startFactoryNoise,
+  stopFactoryNoise,
+} from "@/voice/noiseSimulator";
 
 // 跟 LiveBoard 同一招：正式站才算 production，開發模式多 mock 工具。
 const isDev = process.env.NODE_ENV !== "production";
 const MOCK_URL = "ws://localhost:8787";
 
-// §2.4 Demo 主線 5 句（照順序送，看板出現 1 張單，狀態最後 ended）
+// §2.4 Demo 主線 6 句（含開單＋技師完工解除閉環，看板出現 RT-1001 並更新為 RESOLVED）
 const MAIN_LINE = [
   "Machine three has an alarm.",
   "What does alarm four one four mean?",
   "I checked. Still noisy. Open a repair ticket.",
   "Yes, confirm.",
+  "Ticket RT-1001 is resolved, maintenance complete.",
   "That's all, thanks.",
 ];
 
@@ -109,6 +115,10 @@ function runTool(
           operator_confirmed: string;
         },
       ) as unknown as Record<string, unknown>;
+    case "resolve_repair_ticket":
+      return resolve_repair_ticket(
+        args as { ticket_id: string },
+      ) as unknown as Record<string, unknown>;
     // end_conversation 由瀏覽器端處理（送 session.end，見 §4.4）：先回空結果，
     // 等 reply.done 後送 session.end。
     case "end_conversation":
@@ -132,6 +142,29 @@ export default function OperatorPage() {
   const [draft, setDraft] = useState("");
   const [chat, setChat] = useState<ChatLine[]>([]);
   const [log, setLog] = useState<string[]>([]);
+  const [noiseActive, setNoiseActive] = useState(false);
+  const [activeMachine, setActiveMachine] = useState<string | null>(null);
+  const [activeAlarm, setActiveAlarm] = useState<{
+    code: string;
+    title: string;
+    likely_causes: string;
+    first_checks: string[];
+  } | null>(null);
+  const [toast, setToast] = useState<{
+    text: string;
+    type: "ticket" | "resolve" | "alarm";
+  } | null>(null);
+
+  function toggleNoise() {
+    if (noiseActive) {
+      stopFactoryNoise();
+      setNoiseActive(false);
+    } else {
+      const ok = startFactoryNoise(0.35);
+      if (ok) setNoiseActive(true);
+    }
+  }
+
   const ws = useRef<WebSocket | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAt = useRef<number>(0);
@@ -314,6 +347,38 @@ export default function OperatorPage() {
       setStatus("thinking");
       push(`down: tool.call ${msg.name} ${JSON.stringify(msg.arguments ?? {})}`);
       const result = runTool(String(msg.name ?? ""), msg.arguments ?? {});
+      const toolName = String(msg.name ?? "");
+      if (toolName === "get_machine_status" && msg.arguments?.machine_id) {
+        setActiveMachine(String(msg.arguments.machine_id));
+      }
+      if (toolName === "lookup_alarm" && !("error" in result)) {
+        setActiveAlarm(
+          result as unknown as {
+            code: string;
+            title: string;
+            likely_causes: string;
+            first_checks: string[];
+          },
+        );
+        if (msg.arguments?.machine_id) {
+          setActiveMachine(String(msg.arguments.machine_id));
+        }
+      }
+      if (toolName === "create_repair_ticket" && !("error" in result)) {
+        const ticketRes = result as unknown as { ticket_id: string };
+        setToast({
+          text: `Repair ticket ${ticketRes.ticket_id} created for ${String(msg.arguments?.machine_id ?? "machine")}!`,
+          type: "ticket",
+        });
+      }
+      if (toolName === "resolve_repair_ticket" && !("error" in result)) {
+        const resTicket = result as unknown as { ticket_id: string };
+        setToast({
+          text: `Repair ticket ${resTicket.ticket_id} marked as RESOLVED!`,
+          type: "resolve",
+        });
+        setActiveAlarm(null);
+      }
       try {
         sock?.send(JSON.stringify(buildToolResult(String(msg.call_id ?? ""), result)));
       } catch {
@@ -545,6 +610,11 @@ export default function OperatorPage() {
     closeSocket();
     stopAudio();
     stopTimer();
+    stopFactoryNoise();
+    setNoiseActive(false);
+    setActiveMachine(null);
+    setActiveAlarm(null);
+    setToast(null);
     liveRef.current = false;
     setStatus("idle");
     setSeconds(0);
@@ -586,6 +656,7 @@ export default function OperatorPage() {
       window.removeEventListener("pagehide", onHide);
       if (timer.current) clearInterval(timer.current);
       stopAudio();
+      stopFactoryNoise();
       if (ws.current) {
         try {
           ws.current.close();
@@ -665,121 +736,201 @@ export default function OperatorPage() {
               ) : null}
             </label>
 
-            <div className="flex flex-wrap gap-2">
-              {status === "idle" ||
-              status === "ended" ||
-              status === "error" ? (
-                <button
-                  onClick={status === "ended" ? reset : startCall}
-                  disabled={checking}
-                  className="rounded bg-[#0056b3] px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {checking
-                    ? "Checking passcode..."
-                    : status === "ended"
-                      ? "Start again"
-                      : isDev
-                        ? "Start call (mock)"
-                        : "Start call"}
-                </button>
-              ) : (
-                <button
-                  onClick={endCall}
-                  className="rounded bg-[#b71c1c] px-4 py-2 text-sm font-bold text-white hover:bg-[#c62828]"
-                >
-                  End call (session.end)
-                </button>
-              )}
-            </div>
-          </section>
-
-          {isDev ? (
-            <section className="flex flex-col gap-3 hh-card rounded-lg p-4">
-              <h2 className="text-base font-bold text-[#202731]">Simulate speech</h2>
-              <p className="text-sm text-slate-600">
-                Dev only: sends mock.say to the mock server. Or run the
-                demo main line in order:
-              </p>
               <div className="flex flex-wrap gap-2">
-                {MAIN_LINE.map((line, i) => (
+                {status === "idle" ||
+                status === "ended" ||
+                status === "error" ? (
                   <button
-                    key={i}
-                    type="button"
-                    onClick={() => sendSay(line)}
-                    disabled={!onCall}
-                    className="hh-softkey rounded px-3 py-1.5 text-sm font-bold text-[#202731] disabled:opacity-40"
+                    onClick={status === "ended" ? reset : startCall}
+                    disabled={checking}
+                    className="rounded bg-[#0056b3] px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
                   >
-                    {["①", "②", "③", "④", "⑤"][i]} Send line {i + 1}
+                    {checking
+                      ? "Checking passcode..."
+                      : status === "ended"
+                        ? "Start again"
+                        : isDev
+                          ? "Start call (mock)"
+                          : "Start call"}
                   </button>
-                ))}
-              </div>
-              <form
-                className="flex gap-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  sendSay(draft);
-                }}
-              >
-                <input
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  placeholder="Type what the operator says…"
-                  autoComplete="off"
-                  disabled={!onCall}
-                  className="flex-1 rounded border border-slate-400 bg-white px-3 py-2 text-sm text-[#14181f]"
-                />
+                ) : (
+                  <button
+                    onClick={endCall}
+                    className="rounded bg-[#b71c1c] px-4 py-2 text-sm font-bold text-white hover:bg-[#c62828]"
+                  >
+                    End call (session.end)
+                  </button>
+                )}
+
                 <button
-                  type="submit"
-                  disabled={!onCall}
-                  className="rounded bg-[#0056b3] px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-40"
+                  type="button"
+                  onClick={toggleNoise}
+                  className={`rounded px-3 py-2 text-sm font-bold border transition-colors flex items-center gap-1.5 ${
+                    noiseActive
+                      ? "bg-amber-600 text-white border-amber-700 shadow-sm animate-pulse"
+                      : "bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200"
+                  }`}
+                  title="Play synthesized 75dB CNC shopfloor noise to test AssemblyAI Voice Focus noise suppression"
                 >
-                  Send
+                  <span>{noiseActive ? "🔊 Factory Noise: 75dB (ON)" : "🔈 Simulate Noise (75dB)"}</span>
                 </button>
-              </form>
+              </div>
             </section>
-          ) : null}
 
-          <section className="flex flex-col gap-2 hh-card rounded-lg p-4">
-            <h2 className="text-base font-bold text-[#202731]">Transcript</h2>
-            {chat.length === 0 ? (
-              <p className="text-sm text-slate-600">
-                No speech yet.
-                {isDev ? " Press Start, then ①–⑤." : " Press Start and speak."}
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-2 text-sm leading-6">
-                {chat.map((line, i) => (
-                  <li key={i}>
-                    <span className="font-medium">
-                      {line.who === "you" ? "Operator: " : "Assistant: "}
+            {isDev ? (
+              <section className="flex flex-col gap-3 hh-card rounded-lg p-4">
+                <h2 className="text-base font-bold text-[#202731]">Simulate speech</h2>
+                <p className="text-sm text-slate-600">
+                  Dev only: sends mock.say to the mock server. Or run the
+                  demo main line in order:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {MAIN_LINE.map((line, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => sendSay(line)}
+                      disabled={!onCall}
+                      className="hh-softkey rounded px-3 py-1.5 text-sm font-bold text-[#202731] disabled:opacity-40"
+                    >
+                      {["①", "②", "③", "④", "⑤", "⑥"][i]} Send line {i + 1}
+                    </button>
+                  ))}
+                </div>
+                <form
+                  className="flex gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    sendSay(draft);
+                  }}
+                >
+                  <input
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    placeholder="Type what the operator says…"
+                    autoComplete="off"
+                    disabled={!onCall}
+                    className="flex-1 rounded border border-slate-400 bg-white px-3 py-2 text-sm text-[#14181f]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!onCall}
+                    className="rounded bg-[#0056b3] px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-40"
+                  >
+                    Send
+                  </button>
+                </form>
+              </section>
+            ) : null}
+
+            <section className="flex flex-col gap-2 hh-card rounded-lg p-4">
+              <h2 className="text-base font-bold text-[#202731]">Transcript</h2>
+              {chat.length === 0 ? (
+                <p className="text-sm text-slate-600">
+                  No speech yet.
+                  {isDev ? " Press Start, then ①–⑥." : " Press Start and speak."}
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-2 text-sm leading-6">
+                  {chat.map((line, i) => (
+                    <li key={i}>
+                      <span className="font-medium">
+                        {line.who === "you" ? "Operator: " : "Assistant: "}
+                      </span>
+                      {line.text}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="flex flex-col gap-2 hh-card rounded-lg p-4">
+              <h2 className="text-base font-bold text-[#202731]">
+                Event log{isDev ? " (mock)" : ""}
+              </h2>
+              {log.length === 0 ? (
+                <p className="text-sm text-slate-600">
+                  No events yet. Press “Start”.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-1 font-mono text-xs leading-5">
+                  {log.map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+
+          <div className="flex flex-col gap-6">
+            {/* Active Telemetry Focus */}
+            {activeMachine || activeAlarm ? (
+              <section className="hh-card rounded-lg p-4 border-l-4 border-l-[#b71c1c] bg-rose-50/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-rose-800 flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full bg-rose-600 animate-ping" />
+                    Target: {activeMachine ?? "M03"} (CNC Lathe)
+                  </span>
+                  {activeAlarm ? (
+                    <span className="rounded bg-rose-100 border border-rose-300 px-2 py-0.5 font-mono text-xs font-bold text-rose-900">
+                      ALARM {activeAlarm.code}
                     </span>
-                    {line.text}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+                  ) : (
+                    <span className="rounded bg-slate-100 border border-slate-300 px-2 py-0.5 text-xs text-slate-700">
+                      STATUS CHECK
+                    </span>
+                  )}
+                </div>
+                {activeAlarm ? (
+                  <div className="mt-2 space-y-2 text-xs">
+                    <div className="font-semibold text-slate-900">
+                      {activeAlarm.title}
+                    </div>
+                    <div className="text-slate-600">
+                      <span className="font-medium text-slate-700">Cause: </span>
+                      {activeAlarm.likely_causes}
+                    </div>
+                    <div className="rounded border border-slate-200 bg-white p-2.5 shadow-xs">
+                      <div className="font-bold text-slate-800 mb-1">
+                        First 3 Checks (On-site protocol):
+                      </div>
+                      <ol className="list-decimal list-inside space-y-1 text-slate-600">
+                        {activeAlarm.first_checks.map((check, idx) => (
+                          <li key={idx}>{check}</li>
+                        ))}
+                      </ol>
+                    </div>
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
 
-          <section className="flex flex-col gap-2 hh-card rounded-lg p-4">
-            <h2 className="text-base font-bold text-[#202731]">
-              Event log{isDev ? " (mock)" : ""}
-            </h2>
-            {log.length === 0 ? (
-              <p className="text-sm text-slate-600">
-                No events yet. Press “Start”.
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-1 font-mono text-xs leading-5">
-                {log.map((line, i) => (
-                  <li key={i}>{line}</li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </div>
+            {/* Toast Notification */}
+            {toast ? (
+              <div
+                className={`rounded-lg border px-4 py-3 text-sm font-semibold flex items-center justify-between shadow-xs ${
+                  toast.type === "resolve"
+                    ? "bg-emerald-50 text-emerald-900 border-emerald-300"
+                    : "bg-blue-50 text-blue-900 border-blue-300"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>{toast.type === "resolve" ? "✅" : "🔔"}</span>
+                  <span>{toast.text}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setToast(null)}
+                  className="text-xs opacity-60 hover:opacity-100 font-bold ml-2"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : null}
 
-          <div className="hh-card rounded-lg p-4">
-            <LiveBoard compact />
+            <div className="hh-card rounded-lg p-4">
+              <LiveBoard compact />
+            </div>
           </div>
         </div>
       </main>

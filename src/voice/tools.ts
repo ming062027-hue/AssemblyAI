@@ -123,5 +123,24 @@ export const TOOLS_S1 = [
     },
     execution_mode: "interactive",
     timeout_seconds: 30
+  },
+  {
+    type: "function",
+    name: "resolve_repair_ticket",
+    description: "Mark an open repair ticket as resolved and completed by a technician.",
+    parameters: {
+      type: "object",
+      properties: {
+        ticket_id: {
+          type: "string",
+          description: "The ID of the repair ticket to resolve (e.g. RT-1001).",
+          pattern: "RT-[0-9]{4}",
+          examples: ["RT-1001"]
+        }
+      },
+      required: ["ticket_id"]
+    },
+    execution_mode: "interactive",
+    timeout_seconds: 30
   }
 ];
