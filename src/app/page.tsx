@@ -17,6 +17,11 @@ import {
 } from "@/console/commands";
 import { subscribe, list, type Ticket } from "@/board/ticketStore";
 import { useVoiceAgentBridge } from "@/voice/useVoiceAgentBridge";
+import { useWakeWordListener, playWakeChime } from "@/voice/wakeWord";
+import {
+  useFactoryHeartbeat,
+  formatSecondsToMS,
+} from "@/console/factoryHeartbeat";
 import {
   get_machine_status,
   lookup_alarm,
@@ -92,6 +97,10 @@ export default function Home() {
   const [agvMsg, setAgvMsg] = useState<string | null>(null);
   const [supplierMsg, setSupplierMsg] = useState<string | null>(null);
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 🏭 工廠真實心跳動態引擎（G-code 滾動、週期倒數、OEE、停機損失計價、刀具磨損）
+  const heartbeat = useFactoryHeartbeat(isAlarm);
+  const [wakeEnabled, setWakeEnabled] = useState(true);
 
   // Model宇宙 語音管家
   const [mvListening, setMvListening] = useState(false);
@@ -365,6 +374,23 @@ export default function Home() {
     [bridge, passcode, liveModeWanted, openDialog, runModelCommand],
   );
 
+  // 🎙️ 免接觸「嘿宇宙」/「宇宙」喚醒監聽（現場黑手免觸摸螢幕，Siri 級無感體驗）
+  useWakeWordListener({
+    enabled: wakeEnabled,
+    onWake: () => {
+      openDialog();
+      playWakeChime();
+      const msg = "我在，請說！";
+      setMvReply(msg);
+      speak(msg, "zh");
+    },
+    onCommand: (cmd) => {
+      openDialog();
+      playWakeChime();
+      sendQuick(cmd);
+    },
+  });
+
   // 開機巡檢：載入後自動掃 5 站＋庫存＋待修單，宇宙開場報告＋問從哪開始。
   // 延遲 1.5 秒等 TTS 聲音載入；警報站（M03）存在時直接亮紅燈＋推播。
   useEffect(() => {
@@ -540,30 +566,63 @@ export default function Home() {
         onLoad={refreshIcons}
       />
 
-      <header className="bg-[#202731] text-white px-6 py-2.5 flex justify-between items-center border-b-2 border-[#12161c] shadow-md">
+      <header className="bg-[#202731] text-white px-6 py-2.5 flex flex-wrap justify-between items-center border-b-2 border-[#12161c] shadow-md gap-3">
         <div className="flex items-center space-x-4">
-          <div className="bg-[#0056b3] text-white font-black text-sm px-3 py-1 tracking-wider uppercase rounded-sm border border-blue-400">
+          <div className="bg-[#0056b3] text-white font-black text-sm px-3 py-1 tracking-wider uppercase rounded-sm border border-blue-400 shadow-sm">
             CNC-640
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-bold text-base tracking-wide">SMART FACTORY SYSTEM · 智慧工廠總控系統</span>
               <span className="text-xs px-2 py-0.5 rounded bg-emerald-900/80 text-emerald-300 font-mono font-semibold border border-emerald-600">
                 AUTO RUN
               </span>
+              <span className="text-xs px-2 py-0.5 rounded bg-blue-900/80 text-cyan-300 font-mono font-semibold border border-blue-600" title={`可用率 ${heartbeat.oeeAvailability}% · 表現率 ${heartbeat.oeePerformance}% · 品質率 ${heartbeat.oeeQuality}%`}>
+                OEE {heartbeat.oeeTotal}%
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-amber-300 font-mono font-semibold border border-slate-600">
+                🎯 今日產量: {heartbeat.partsToday}/{heartbeat.partsTarget} PCS ({heartbeat.completionRate}%)
+              </span>
             </div>
-            <div className="text-[11px] text-slate-400 font-mono flex items-center gap-3">
+            <div className="text-[11px] text-slate-400 font-mono flex items-center gap-3 mt-0.5">
               <span>MODE: FULL AUTONOMOUS</span>
               <span>•</span>
               <span>VIEW: {TAB_NAMES[view]}</span>
+              <span>•</span>
+              <span className="text-slate-300">工單: #WO-2026-A109 (航太鈦合金葉片)</span>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3 font-mono text-xs">
+
+        <div className="flex items-center gap-2.5 font-mono text-xs flex-wrap">
+          {/* 免接觸「嘿宇宙」語音喚醒開關 */}
+          <button
+            type="button"
+            onClick={() => setWakeEnabled((v) => !v)}
+            title={wakeEnabled ? "免觸控語音喚醒中（黑手免碰螢幕，喊「嘿宇宙」即可）" : "免觸控語音喚醒已關閉，點擊開啟"}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs font-mono font-semibold transition ${
+              wakeEnabled
+                ? "bg-purple-950/80 border-purple-500 text-purple-200 hover:bg-purple-900"
+                : "bg-slate-800 border-slate-600 text-slate-400 hover:bg-slate-700"
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${wakeEnabled ? "bg-purple-400 animate-pulse" : "bg-slate-500"}`} />
+            <span>🎙️ 嘿宇宙: {wakeEnabled ? "ON (免觸控)" : "OFF"}</span>
+          </button>
+
+          {/* 停機損失即時跳表（老闆視角：每秒都在算錢） */}
+          {isAlarm && (
+            <div className="flex items-center gap-1.5 bg-rose-950/90 px-3 py-1.5 rounded border border-rose-500 text-rose-300 font-mono font-bold animate-pulse shadow-sm">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+              <span>⏱ 停機損失: ${heartbeat.downtimeCostUSD} USD ({heartbeat.downtimeSec}s)</span>
+            </div>
+          )}
+
           <div className="flex items-center gap-1.5 bg-[#14181f] px-3 py-1.5 rounded border border-slate-700">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-emerald-400 font-bold">READY</span>
           </div>
+
           <div className="flex items-center gap-1.5 bg-[#14181f] px-3 py-1.5 rounded border border-slate-700">
             {isAlarm ? (
               <>
@@ -577,6 +636,7 @@ export default function Home() {
               </>
             )}
           </div>
+
           <div className="bg-black/60 px-3 py-1.5 rounded border border-slate-700 text-amber-300 font-bold text-sm tracking-wider">
             {clock}
           </div>
@@ -745,6 +805,141 @@ export default function Home() {
               </div>
             </section>
 
+            {/* 工業級 CNC-640 實體加工中心即時動態（G-Code / Klartext 程式流 ＋ 主軸物理遙測） */}
+            <section className="hh-card rounded-lg p-4 font-sans">
+              <div className="flex justify-between items-center pb-2 mb-3 border-b border-[#9aa3b4]">
+                <h2 className="text-sm font-bold flex items-center gap-2 text-[#202731]">
+                  <i data-lucide="cpu" className="w-4 h-4 text-[#0056b3]" />
+                  CNC-640 5軸高速加工中心 · 實體切削遙測與程式流
+                </h2>
+                <div className="flex items-center gap-3 text-xs font-mono">
+                  <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-300">
+                    刀具: <strong className="text-blue-700">{heartbeat.tools[2]?.id || "T03"}</strong> (R4 圓鼻銑刀)
+                  </span>
+                  <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-300 font-bold">
+                    週期剩餘: {formatSecondsToMS(heartbeat.cycleRemainSec)} / 04:30
+                  </span>
+                </div>
+              </div>
+
+              {/* 切削進度條 */}
+              <div className="mb-3">
+                <div className="flex justify-between text-[11px] font-mono text-slate-600 mb-1">
+                  <span>單件切削進度 (CYCLE PROGRESS)</span>
+                  <span>{Math.round(((270 - heartbeat.cycleRemainSec) / 270) * 100)}% (完成將自動入庫並計數)</span>
+                </div>
+                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-[#0056b3] h-full rounded-full transition-all duration-1000"
+                    style={{ width: `${Math.round(((270 - heartbeat.cycleRemainSec) / 270) * 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+                {/* 左側：實體 G-Code / Klartext 執行視窗（綠/黑 CRT 工控面板） */}
+                <div className="lg:col-span-7 bg-[#12161c] rounded-lg p-3 border border-slate-700 shadow-inner font-mono text-xs flex flex-col justify-between">
+                  <div className="flex justify-between items-center pb-1.5 border-b border-slate-800 text-[11px] text-slate-400">
+                    <span className="flex items-center gap-1.5 text-cyan-400">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                      PROGRAM: 0420_TITANIUM_BLADE.NC
+                    </span>
+                    <span>BLOCK: N0415 - N0424</span>
+                  </div>
+                  <div className="space-y-1 my-2">
+                    {heartbeat.gcodeList.map((item, idx) => {
+                      const isActive = idx === heartbeat.activeGCodeIdx;
+                      return (
+                        <div
+                          key={item.n}
+                          className={`px-2 py-1 rounded flex justify-between items-center transition-colors text-[11px] ${
+                            isActive
+                              ? "bg-blue-900/60 border border-blue-400 text-amber-300 font-bold shadow-sm"
+                              : "text-slate-400 opacity-75 hover:opacity-100"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={isActive ? "text-cyan-400 font-black" : "text-slate-500"}>
+                              {isActive ? "►" : " "}
+                            </span>
+                            <span>{item.code}</span>
+                          </div>
+                          <span className={`text-[10px] ${isActive ? "text-emerald-300 font-semibold" : "text-slate-500"}`}>
+                            {item.comment} {isActive ? "◄" : ""}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="text-[10px] text-slate-500 flex justify-between border-t border-slate-800 pt-1">
+                    <span>FEED OVERRIDE: 100%</span>
+                    <span>RAPID: 24 m/min</span>
+                    <span>M08 COOLANT: HIGH-PRESSURE</span>
+                  </div>
+                </div>
+
+                {/* 右側：物理感測器即時儀表 */}
+                <div className="lg:col-span-5 grid grid-cols-2 gap-2 font-mono text-xs">
+                  {/* 主軸轉速 */}
+                  <div className="p-2.5 bg-white rounded border border-slate-300 flex flex-col justify-between">
+                    <div className="text-slate-500 text-[10px] flex justify-between">
+                      <span>SPINDLE RPM</span>
+                      <span className="text-emerald-600 font-bold">● RUN</span>
+                    </div>
+                    <div className="text-xl font-black text-slate-800 my-1">
+                      {heartbeat.spindleRpm} <span className="text-xs font-normal text-slate-500">RPM</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500">目標設定: 8,500 RPM</div>
+                  </div>
+
+                  {/* 主軸負載 */}
+                  <div className={`p-2.5 rounded border flex flex-col justify-between ${
+                    isAlarm ? "bg-rose-50 border-rose-400" : "bg-white border-slate-300"
+                  }`}>
+                    <div className="text-slate-500 text-[10px] flex justify-between">
+                      <span>SPINDLE LOAD</span>
+                      <span className={isAlarm ? "text-rose-600 font-bold animate-pulse" : "text-blue-600 font-bold"}>
+                        {isAlarm ? "OVERLOAD" : "NORMAL"}
+                      </span>
+                    </div>
+                    <div className={`text-xl font-black my-1 ${isAlarm ? "text-rose-700 animate-pulse" : "text-slate-800"}`}>
+                      {heartbeat.spindleLoadPct}%
+                    </div>
+                    <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${heartbeat.spindleLoadPct > 100 ? "bg-rose-600" : heartbeat.spindleLoadPct > 85 ? "bg-amber-500" : "bg-emerald-600"}`}
+                        style={{ width: `${Math.min(heartbeat.spindleLoadPct, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 進給率 */}
+                  <div className="p-2.5 bg-white rounded border border-slate-300 flex flex-col justify-between">
+                    <div className="text-slate-500 text-[10px] flex justify-between">
+                      <span>ACTUAL FEED</span>
+                      <span className="text-slate-400">G01/G02</span>
+                    </div>
+                    <div className="text-xl font-black text-slate-800 my-1">
+                      {heartbeat.feedRateActual} <span className="text-xs font-normal text-slate-500">mm/min</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500">伺服響應: 0.8ms</div>
+                  </div>
+
+                  {/* 切削液壓力 */}
+                  <div className="p-2.5 bg-white rounded border border-slate-300 flex flex-col justify-between">
+                    <div className="text-slate-500 text-[10px] flex justify-between">
+                      <span>COOLANT PRESS</span>
+                      <span className="text-emerald-600 font-bold">NORMAL</span>
+                    </div>
+                    <div className="text-xl font-black text-slate-800 my-1">
+                      {heartbeat.coolantPressureBar} <span className="text-xs font-normal text-slate-500">BAR</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500">過濾精度: 10µm</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             {/* 語音開單即時看板（Model宇宙 開的單；resolved 標已完成） */}
             <section className="hh-card rounded-lg p-4">
               <div className="flex justify-between items-center pb-2 mb-2 border-b border-[#9aa3b4]">
@@ -882,7 +1077,20 @@ export default function Home() {
                     <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold">運行中</span>
                   </div>
                   <div className="text-[11px] text-slate-600">碼頭卸貨 ➜ WMS 立體庫 (電量 88%)</div>
-                  <div className="flex gap-2">
+                  {/* 動態搬運進度條 */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px] font-mono text-slate-500">
+                      <span>路徑進度: 碼頭 A ➔ 立體倉 03</span>
+                      <span className="text-blue-600 font-bold">{heartbeat.agv1Progress}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-blue-600 h-full rounded-full transition-all duration-1000"
+                        style={{ width: `${heartbeat.agv1Progress}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-1">
                     <button type="button" onClick={() => dispatchAgv("AGV-01", "返回碼頭")} className="flex-1 py-1.5 bg-slate-200 hover:bg-slate-300 rounded text-xs font-bold">調回碼頭</button>
                     <button type="button" onClick={() => dispatchAgv("AGV-01", "前往充電樁")} className="py-1.5 px-3 bg-slate-200 hover:bg-slate-300 rounded text-xs font-bold">回充</button>
                   </div>
@@ -893,7 +1101,20 @@ export default function Home() {
                     <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">視訊連線中</span>
                   </div>
                   <div className="text-[11px] text-slate-600">立體倉出料口待命位 (電量 95%)</div>
-                  <div className="flex gap-2">
+                  {/* 動態補料進度條 */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px] font-mono text-slate-500">
+                      <span>補料路徑: 立體倉 ➔ 1號手臂</span>
+                      <span className="text-amber-600 font-bold">{heartbeat.agv2Progress}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-amber-600 h-full rounded-full transition-all duration-1000"
+                        style={{ width: `${heartbeat.agv2Progress}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-1">
                     <button type="button" onClick={() => dispatchAgv("AGV-02", "送料至 1 號手臂")} className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold">補料至 1 號手臂</button>
                     <button type="button" onClick={() => dispatchAgv("AGV-02", "送料至 2 號手臂")} className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold">補料至 2 號手臂</button>
                   </div>
@@ -1014,6 +1235,84 @@ export default function Home() {
                 </div>
               </div>
             </div>
+
+            {/* CNC 24 刀位刀庫壽命即時監控（主管/班長視角：防斷刀、提前備刀） */}
+            <div className="p-3 bg-white rounded border border-slate-300 space-y-3 font-sans">
+              <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                  <i data-lucide="disc" className="w-4 h-4 text-[#0056b3]" />
+                  <span>CNC-640 刀庫 24 刀位動態壽命與磨損預警監控</span>
+                </div>
+                <span className="text-[10px] font-mono text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded font-bold">
+                  ⚠ 1 支刀具接近磨損極限
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs font-mono">
+                {heartbeat.tools.map((t) => {
+                  const isCritical = t.life <= 15;
+                  const isWarning = t.life <= 30 && t.life > 15;
+                  return (
+                    <div
+                      key={t.id}
+                      className={`p-2 rounded border flex flex-col justify-between ${
+                        isCritical
+                          ? "bg-rose-50 border-rose-400 shadow-sm"
+                          : isWarning
+                            ? "bg-amber-50 border-amber-300"
+                            : "bg-slate-50 border-slate-200"
+                      }`}
+                    >
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="font-bold text-slate-800">{t.id}</span>
+                        <span
+                          className={`font-black ${
+                            isCritical
+                              ? "text-rose-600 animate-pulse"
+                              : isWarning
+                                ? "text-amber-700"
+                                : "text-emerald-600"
+                          }`}
+                        >
+                          {t.life}%
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-600 my-1 truncate" title={`${t.name} ${t.spec}`}>
+                        {t.name}
+                      </div>
+                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${
+                            isCritical ? "bg-rose-600" : isWarning ? "bg-amber-500" : "bg-emerald-600"
+                          }`}
+                          style={{ width: `${t.life}%` }}
+                        />
+                      </div>
+                      <div className="mt-1 text-[9px] text-slate-500 flex justify-between">
+                        <span>預估剩餘</span>
+                        <span className={isCritical ? "text-rose-700 font-bold" : ""}>
+                          {isCritical ? "12 分鐘" : "正常"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="p-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-900 flex items-center justify-between">
+                <span>
+                  💡 <strong>智慧刀具調度連動</strong>：T03 圓鼻銑刀壽命僅剩 12%，系統已自動排定於本工單完成後，引導 AGV-02 遞送新刀具至刀庫換刀位。
+                </span>
+                <button
+                  type="button"
+                  onClick={() => sendQuick("檢查刀具磨損狀態")}
+                  className="px-2 py-1 bg-amber-700 hover:bg-amber-800 text-white rounded text-[10px] font-bold whitespace-nowrap ml-2"
+                >
+                  語音回報刀況
+                </button>
+              </div>
+            </div>
+
             <div className="p-3 bg-white rounded border border-slate-300 text-xs font-sans space-y-1">
               <div className="font-bold text-slate-800 flex items-center gap-1.5">
                 <i data-lucide="wrench" className="w-4 h-4 text-rose-600" />
@@ -1398,6 +1697,34 @@ export default function Home() {
                 className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
               >
                 📋 今日工廠日報
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("檢查刀具磨損狀態")}
+                className="text-[10px] px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 hover:border-amber-400 text-amber-800 border border-amber-300 transition"
+              >
+                🗡️ 刀具磨損預警
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("今天生產進度")}
+                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
+              >
+                🎯 今日產量進度
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("這件還要切多久")}
+                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 hover:border-blue-300 text-slate-700 border border-slate-300 transition"
+              >
+                ⏱️ 切削倒數時間
+              </button>
+              <button
+                type="button"
+                onClick={() => sendQuick("查詢OEE與停機損失")}
+                className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-rose-100 hover:border-rose-300 text-slate-700 border border-slate-300 transition"
+              >
+                📈 OEE與停機損失
               </button>
             </div>
 

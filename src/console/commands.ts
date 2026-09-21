@@ -382,6 +382,50 @@ export function interpret(raw: string, ctx: CommandContext, extra: InterpretExtr
     };
   }
 
+  // 0.61) 刀具壽命預警。
+  if (/(刀具|換刀|刀庫|磨損|tool life|tool wear)/i.test(text)) {
+    return {
+      ...base,
+      navigate: "f3",
+      actionId: "tool.status",
+      response:
+        "刀庫巡檢回報：T03 精銑球刀 R4 壽命僅剩 12%，已觸發磨耗預警，建議加工 2 件後更換備刀；其餘 T01、T02、T04~T06 壽命均大於 65% 正常。",
+    };
+  }
+
+  // 0.62) 生產進度與工單。
+  if (/(今天進度|生產進度|完成幾件|達成率|目標|工單進度|production progress|target)/i.test(text)) {
+    return {
+      ...base,
+      navigate: "f1",
+      actionId: "production.progress",
+      response:
+        "今日生產進度：當班目標 500 件，目前已完成 348 件，達成率 69.6%，工單 #WO-2026-A109 航太渦輪葉片現正切削中，預估 16:45 準時完工交付。",
+    };
+  }
+
+  // 0.63) 單件倒數時間。
+  if (/(這件還要|切多久|加工時間|倒數|還要多久|cycle time|remaining)/i.test(text)) {
+    return {
+      ...base,
+      navigate: "f1",
+      actionId: "cycle.remaining",
+      response:
+        "工件加工進度：目前執行單節 N0420 葉片型面精銑，本件剩餘約 1 分 15 秒，主軸轉速 8500 RPM，切削負載 74% 穩定。",
+    };
+  }
+
+  // 0.64) OEE 稼動率與停機損失。
+  if (/(oee|稼動率|生產效率|停機損失|燒多少錢)/i.test(text)) {
+    return {
+      ...base,
+      navigate: "f1",
+      actionId: "oee.status",
+      response:
+        "工廠 OEE 總體效率：稼動率 92.4% × 效率 95.2% × 良率 99.4% = 總體 OEE 87.5%（優於產業標準 85%）。目前產線正常運轉無停機損失。",
+    };
+  }
+
   // 0.65) 智慧戰情分析（深度診斷報告，NotebookLM 級別）。
   if (/(戰情|分析報告|智慧分析|診斷|notebooklm|briefing|executive|綜合報告)/i.test(text)) {
     return {
