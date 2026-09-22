@@ -2958,26 +2958,7 @@ export default function Home() {
                     EN
                   </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setLiveModeWanted((prev) => !prev)}
-                  title={
-                    langMode === "en"
-                      ? liveModeWanted
-                        ? "Currently Live AssemblyAI mode. Click to switch to Mock"
-                        : "Currently Mock mode. Click to switch to Live AssemblyAI"
-                      : liveModeWanted
-                        ? "目前為 AssemblyAI 真人模式，點擊切換為 Mock 模擬模式"
-                        : "目前為 Mock 模擬模式，點擊切換為 AssemblyAI 真人模式"
-                  }
-                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded border font-semibold ${
-                    liveModeWanted
-                      ? "bg-purple-100 text-purple-800 border-purple-300"
-                      : "bg-slate-100 text-slate-700 border-slate-300"
-                  }`}
-                >
-                  {liveModeWanted ? "⚡ Live" : "🤖 Mock"}
-                </button>
+                
                 <button
                   type="button"
                   onClick={() => setShowConfig((prev) => !prev)}
