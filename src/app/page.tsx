@@ -399,10 +399,10 @@ export default function Home() {
 
   // 🏭 工廠真實心跳動態引擎（G-code 滾動、週期倒數、OEE、停機損失計價、刀具磨損、三大工單、故障演練、品檢、綠能）
   const heartbeat = useFactoryHeartbeat(isAlarm, (alarm) => setIsAlarm(alarm));
-  const [wakeEnabled, setWakeEnabled] = useState(true);
+  const [wakeEnabled, setWakeEnabled] = useState(false);
 
   // 🌐 國際競賽雙語切換 (zh: 繁體中文現場 / en: International Competition English)
-  const [langMode, setLangMode] = useState<"zh" | "en">("zh");
+  const [langMode, setLangMode] = useState<"zh" | "en">("en");
 
   // 📞 外部 AI 催料通話狀態 (idle | calling | done)
   const [supplierCallStatus, setSupplierCallStatus] = useState<"idle" | "calling" | "done">("idle");
@@ -413,7 +413,7 @@ export default function Home() {
       targetEn: "Robot Arm OEM Emergency Service Desk",
       duration: "通話 52 秒",
       durationEn: "Call 52s",
-      time: "2026-09-19 13:10:15",
+      time: "模擬時間: T-1h",
       aiSay: "2號手臂發生 E-402 伺服負載 142% 警報，現場無障礙物，判定內部卡料需工程師到廠。",
       aiSayEn: "Robot Arm #2 triggered E-402 Servo Overload at 142%. Workspace clear; internal mechanical jam diagnosed, field engineer requested.",
       respSay: "工單已成立，已指派工程師攜帶備品，預計 15:00 前抵達。",
@@ -428,7 +428,7 @@ export default function Home() {
       targetEn: "Jinmao Steel Sales Desk",
       duration: "通話 38 秒",
       durationEn: "Call 38s",
-      time: "2026-09-19 12:45:00",
+      time: "模擬時間: T-2h",
       aiSay: "李經理，S45C Ø50 圓棒庫存已跌破安全線，請依協議緊急配送 200 支。",
       aiSayEn: "Manager Li, S45C Ø50 bar stock dropped below safety line. Please expedite delivery of 200 pcs per SLA.",
       respSay: "有現貨，已排明日第一班車送達。",
@@ -453,7 +453,7 @@ export default function Home() {
   const recognitionRef = useRef<SpeechRec | null>(null);
 
   // Live vs Mock mode settings
-  const [liveModeWanted, setLiveModeWanted] = useState(false);
+  const [liveModeWanted, setLiveModeWanted] = useState(true);
   const [passcode, setPasscode] = useState("414");
   const [showConfig, setShowConfig] = useState(false);
 
@@ -3193,15 +3193,20 @@ export default function Home() {
         </button>
       </div>
 
-      <footer className="bg-[#202731] text-slate-400 text-xs px-6 py-2 flex justify-between items-center border-t border-slate-700 font-mono">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400" />
-          <span className="text-slate-200 font-bold">STATUS:</span>
-          <span>ALL SENSORS SYNCHRONIZED. VIDEO PIPELINE CONNECTED.</span>
+      <footer className="bg-[#202731] text-slate-400 text-xs px-6 py-2 flex flex-col sm:flex-row sm:justify-between items-center gap-2 border-t border-slate-700 font-mono">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="text-slate-200 font-bold">STATUS:</span>
+            <span>ALL SENSORS SYNCHRONIZED. (Demo data is simulated)</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <a href="/operator" className="text-blue-400 hover:text-white underline">Operator Demo</a>
+            <a href="/dashboard" className="text-blue-400 hover:text-white underline">Supervisor Board</a>
+            <a href="/pitch" className="text-blue-400 hover:text-white underline">Pitch Deck</a>
+          </div>
         </div>
         <div className="flex items-center gap-4 text-[11px]">
-          <span>SYNC: 100%</span>
-          <span>LATENCY: 8ms</span>
           <span className="text-amber-300 font-bold" data-testid="site-version">
             VoiceAndon {SITE_VERSION}
           </span>

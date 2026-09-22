@@ -163,7 +163,9 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
     const line = text.trim();
     if (!line) return;
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({ type: "mock.say", text: line }));
+      if (!liveRef.current) {
+        ws.current.send(JSON.stringify({ type: "mock.say", text: line }));
+      }
       setLastUserSay(line);
     }
   }, []);
