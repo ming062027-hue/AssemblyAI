@@ -457,6 +457,15 @@ export default function Home() {
   const [passcode, setPasscode] = useState("414");
   const [showConfig, setShowConfig] = useState(false);
 
+  // AI 自主行動摘要的時間：原本寫死 13:10:15／12:45:00，錄影或評審在別的時段開，
+  // 就會變成「未來時間」。改成掛載後由當下時間往回推（模擬資料，Claude 審查 Y2，2026-09-23）。
+  const [aiActionAt, setAiActionAt] = useState<{ oem: string; supplier: string } | null>(null);
+  useEffect(() => {
+    const minutesAgo = (m: number) =>
+      new Date(Date.now() - m * 60_000).toLocaleTimeString("en-GB", { hour12: false });
+    setAiActionAt({ oem: minutesAgo(12), supplier: minutesAgo(47) });
+  }, []);
+
   // Model宇宙 常駐浮層：平時只剩球，對話框講話時才彈出、說完自動收回。
   const [dialogOpen, setDialogOpen] = useState(false);
   const dialogTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1185,6 +1194,28 @@ export default function Home() {
         </div>
       </header>
 
+      {/* 連線失敗要讓人看得見：以前只有瀏覽器主控台有錯誤、畫面一片安靜（Claude 審查，2026-09-23） */}
+      {bridge.status === "error" && (
+        <div
+          role="alert"
+          data-testid="voice-error-banner"
+          className="bg-rose-50 border-b border-rose-300 px-4 py-2 text-xs font-mono text-rose-800 flex flex-wrap items-center gap-x-2 gap-y-1"
+        >
+          <span aria-hidden="true">⚠</span>
+          <span className="font-bold">
+            {langMode === "en" ? "Voice connection failed" : "語音連線失敗"}
+          </span>
+          <span>{bridge.error ?? (langMode === "en" ? "Unknown error." : "不明錯誤。")}</span>
+          <button
+            type="button"
+            onClick={() => void toggleVoiceSession()}
+            className="ml-auto px-2 py-0.5 rounded border border-rose-400 text-rose-700 hover:bg-rose-100"
+          >
+            {langMode === "en" ? "Retry" : "重試"}
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col lg:flex-row p-4 gap-4 max-w-[1720px] w-full mx-auto">
         <main className="flex-1 space-y-4">
           {/* ============ F1 流程監控總覽（放大五站 + 警報才出現的面板） ============ */}
@@ -1761,7 +1792,10 @@ export default function Home() {
                   <div className="p-2.5 bg-white rounded border border-slate-300 flex flex-col justify-between">
                     <div className="text-slate-500 text-[10px] flex justify-between">
                       <span>SPINDLE RPM</span>
-                      <span className="text-emerald-600 font-bold">● RUN</span>
+                      {/* 狀態字跟著實際轉速走：停機時不可以還寫 RUN（Claude 審查 Y1，2026-09-23） */}
+                      <span className={heartbeat.spindleRpm > 0 ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>
+                        {heartbeat.spindleRpm > 0 ? "● RUN" : "■ STOP"}
+                      </span>
                     </div>
                     <div className="text-xl font-black text-slate-800 my-1">
                       {heartbeat.spindleRpm} <span className="text-xs font-normal text-slate-500">RPM</span>
@@ -1796,7 +1830,10 @@ export default function Home() {
                   <div className="p-2.5 bg-white rounded border border-slate-300 flex flex-col justify-between">
                     <div className="text-slate-500 text-[10px] flex justify-between">
                       <span>ACTUAL FEED</span>
-                      <span className="text-slate-400">G01/G02</span>
+                      {/* 進給為 0 時標 FEED HOLD，不要讓畫面看起來還在切削（Claude 審查 Y1） */}
+                      <span className={heartbeat.feedRateActual > 0 ? "text-slate-400" : "text-amber-600 font-bold"}>
+                        {heartbeat.feedRateActual > 0 ? "G01/G02" : "FEED HOLD"}
+                      </span>
                     </div>
                     <div className="text-xl font-black text-slate-800 my-1">
                       {heartbeat.feedRateActual} <span className="text-xs font-normal text-slate-500">mm/min</span>
@@ -1810,7 +1847,22 @@ export default function Home() {
                   <div className="p-2.5 bg-white rounded border border-slate-300 flex flex-col justify-between">
                     <div className="text-slate-500 text-[10px] flex justify-between">
                       <span>COOLANT PRESS</span>
-                      <span className="text-emerald-600 font-bold">NORMAL</span>
+                      {/* 壓力歸零時要寫 OFF，不能還寫 NORMAL（Claude 審查 Y1） */}
+                      <span
+                        className={
+                          heartbeat.coolantPressureBar >= 1.2
+                            ? "text-emerald-600 font-bold"
+                            : heartbeat.coolantPressureBar > 0
+                              ? "text-amber-600 font-bold"
+                              : "text-rose-600 font-bold"
+                        }
+                      >
+                        {heartbeat.coolantPressureBar >= 1.2
+                          ? "NORMAL"
+                          : heartbeat.coolantPressureBar > 0
+                            ? "LOW"
+                            : "OFF"}
+                      </span>
                     </div>
                     <div className="text-xl font-black text-slate-800 my-1">
                       {heartbeat.coolantPressureBar} <span className="text-xs font-normal text-slate-500">BAR</span>
@@ -1910,21 +1962,31 @@ export default function Home() {
                 <section className="hh-card rounded-lg p-4 text-xs font-sans space-y-2">
                   <div className="font-bold border-b border-[#9aa3b4] pb-1 flex justify-between">
                     <span>{langMode === "en" ? "AI Autonomous Action Feed" : "AI 大腦最新自主行動摘要"}</span>
-                    <span className="text-emerald-700 font-mono font-bold">CLOSED-LOOP</span>
+                    <span className="flex items-center gap-1.5">
+                      {/* 這一區是模擬資料，不是真的打電話，要標出來（Claude 審查 Y2） */}
+                      <span className="text-[10px] font-mono text-slate-500 border border-slate-300 rounded px-1">
+                        {langMode === "en" ? "SIMULATED" : "模擬"}
+                      </span>
+                      <span className="text-emerald-700 font-mono font-bold">CLOSED-LOOP</span>
+                    </span>
                   </div>
                   <div className="p-2 bg-white rounded border border-slate-300">
                     <div className="text-rose-700 font-bold text-[11px]">
-                      {langMode === "en" ? "● Called OEM Repair Service (13:10:15)" : "● 已致電原廠報修 (13:10:15)"}
+                      {langMode === "en"
+                        ? `● Called OEM Repair Service (${aiActionAt?.oem ?? "--:--:--"})`
+                        : `● 已致電原廠報修 (${aiActionAt?.oem ?? "--:--:--"})`}
                     </div>
                     <div className="text-[11px] text-slate-700 mt-0.5">
                       {langMode === "en"
-                        ? "Booked field engineer today at 15:00 to inspect J2 axis mechanical stall."
-                        : "預約工程師今日 15:00 到廠排查 J2 軸卡料。"}
+                        ? "Field engineer booked for the next shift to inspect J2 axis mechanical stall."
+                        : "已預約下一班工程師到廠排查 J2 軸卡料。"}
                     </div>
                   </div>
                   <div className="p-2 bg-white rounded border border-slate-300">
                     <div className="text-amber-800 font-bold text-[11px]">
-                      {langMode === "en" ? "● Called Material Supplier (12:45:00)" : "● 已致電材料供應商 (12:45:00)"}
+                      {langMode === "en"
+                        ? `● Called Material Supplier (${aiActionAt?.supplier ?? "--:--:--"})`
+                        : `● 已致電材料供應商 (${aiActionAt?.supplier ?? "--:--:--"})`}
                     </div>
                     <div className="text-[11px] text-slate-700 mt-0.5">
                       {langMode === "en"
