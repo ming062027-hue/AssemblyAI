@@ -3181,11 +3181,7 @@ export default function Home() {
             <span className="text-slate-200 font-bold">STATUS:</span>
             <span>ALL SENSORS SYNCHRONIZED. (Demo data is simulated)</span>
           </div>
-          <div className="flex items-center gap-3">
-            <a href="/operator" className="text-blue-400 hover:text-white underline">Operator Demo</a>
-            <a href="/dashboard" className="text-blue-400 hover:text-white underline">Supervisor Board</a>
-            <a href="/pitch" className="text-blue-400 hover:text-white underline">Pitch Deck</a>
-          </div>
+          
         </div>
         <div className="flex items-center gap-4 text-[11px]">
           <span className="text-amber-300 font-bold" data-testid="site-version">
