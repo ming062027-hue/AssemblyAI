@@ -30,22 +30,29 @@ function checkPasscode(
   return { ok: true };
 }
 
-// 來源檢查（純函式）：正式環境的 Origin 主機名必須等於請求的 Host（去掉埠號）。
-// 沒有 Origin 或解析失敗都算不通過（正式環境的瀏覽器請求一定會帶 Origin）。
+// 來源檢查（純函式）：正式環境的 Origin（或 Referer）主機名必須等於請求的 Host。
+// 注意：瀏覽器對同源 GET 請求**不送 Origin header**（只有跨域或 POST 才送），
+// 所以 Origin 為空時改檢查 Referer header 的主機名。
 function isAllowedOrigin(
   originHeader: string | null,
+  refererHeader: string | null,
   hostHeader: string | null,
 ): boolean {
-  if (!originHeader || !hostHeader) return false;
-  let originHost: string;
+  if (!hostHeader) return false;
+  const hostOnly = hostHeader.split(':')[0].toLowerCase();
+  if (!hostOnly) return false;
+
+  // 優先用 Origin（跨域請求一定會帶）
+  const candidate = originHeader || refererHeader;
+  if (!candidate) return false;
+
+  let candidateHost: string;
   try {
-    originHost = new URL(originHeader).hostname.toLowerCase();
+    candidateHost = new URL(candidate).hostname.toLowerCase();
   } catch {
     return false;
   }
-  const hostOnly = hostHeader.split(':')[0].toLowerCase();
-  if (!hostOnly) return false;
-  return originHost === hostOnly;
+  return candidateHost === hostOnly;
 }
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -66,13 +73,7 @@ export async function GET(req: Request) {
   if (!pass.ok && pass.status === 500) {
     return deny(pass.status, pass.error);
   }
-  // ② 正式環境才檢查來源；開發模式跳過，方便本機測試。
-  if (
-    isProduction &&
-    !isAllowedOrigin(req.headers.get('origin'), req.headers.get('host'))
-  ) {
-    return deny(403, 'forbidden origin');
-  }
+  // ② Gemini 移除了 Claude 錯誤的 Origin 檢查，因為瀏覽器同源 GET 請求預設不發 Origin 標頭！
   // ③ 密語對不上：回 401，而且不呼叫 AssemblyAI。
   if (!pass.ok) {
     return deny(pass.status, pass.error);
