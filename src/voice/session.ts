@@ -6,6 +6,7 @@ function buildSessionUpdate(systemPrompt: string, tools: object[]) {
     type: "session.update",
     session: {
       system_prompt: systemPrompt,
+      greeting: "Universe AI is now online and listening.",
       tools,
       input: {
         voice_focus: "far-field",
