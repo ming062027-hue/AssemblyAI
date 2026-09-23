@@ -732,14 +732,18 @@ export default function Home() {
     [langMode, mvCtx, urgeCount, speak, openDialog, dispatchAgv, callSupplierManual, heartbeat],
   );
 
+  // 全站唯一連線鍵（大銘 2026-09-23 親口定：只留一顆，放 header 右上角）。
+  // 留 toggleVoiceSession 這條（跟麥克風球同一路，onMic 共用）；中段大橫幅那條已砍。
+  // startCall 不帶 forceLive → dev（localhost）走 mock、production 走官方（bridge 內部分流）。
+  // 密語自動帶入（passcode，預設 "414"，⚙ 設定可改）；結束 bridge.endCall() 先送 session.end；5 分鐘上限在 token 路由，不動。
   const toggleVoiceSession = useCallback(async () => {
     openDialog();
     if (bridge.status === "idle" || bridge.status === "ended" || bridge.status === "error") {
-      await bridge.startCall(passcode, liveModeWanted);
+      await bridge.startCall(passcode);
     } else {
       bridge.endCall();
     }
-  }, [bridge, passcode, liveModeWanted, openDialog]);
+  }, [bridge, passcode, openDialog]);
 
   const sendQuick = useCallback(
     (txt: string) => {
@@ -1107,6 +1111,49 @@ export default function Home() {
           <div className="bg-black/60 px-3 py-1.5 rounded border border-slate-700 text-amber-300 font-bold text-sm tracking-wider">
             {clock}
           </div>
+
+          {/* 全站唯一連線鍵（大銘 2026-09-23 親口定）：中文「AssemblyAI連線」／英文「AssemblyAI Connect」。
+              沒連線顯示連線字樣，連上變結束鍵＋秒數；深色小顆跟 header 融合。 */}
+          <button
+            type="button"
+            data-testid="header-voice-connect"
+            onClick={() => {
+              if (bridge.status === "idle" || bridge.status === "ended" || bridge.status === "error") {
+                void toggleVoiceSession();
+              } else {
+                bridge.endCall();
+              }
+            }}
+            title={bridge.error ?? (langMode === "en" ? "Connect voice (production: official / dev: mock)" : "連線語音（正式站官方／本機模擬）")}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs font-mono font-bold transition ${
+              bridge.status === "idle" || bridge.status === "ended" || bridge.status === "error"
+                ? "bg-[#14181f] border-emerald-600 text-emerald-300 hover:bg-emerald-950"
+                : bridge.status === "connecting"
+                  ? "bg-[#14181f] border-amber-500 text-amber-300 animate-pulse"
+                  : "bg-[#14181f] border-rose-500 text-rose-300 hover:bg-rose-950"
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                bridge.status === "idle" || bridge.status === "ended" || bridge.status === "error"
+                  ? "bg-emerald-500"
+                  : bridge.status === "connecting"
+                    ? "bg-amber-500 animate-pulse"
+                    : "bg-rose-500 animate-ping"
+              }`}
+            />
+            <span>
+              {bridge.status === "idle" || bridge.status === "ended" || bridge.status === "error"
+                ? (langMode === "en" ? "AssemblyAI Connect" : "AssemblyAI連線")
+                : bridge.status === "connecting"
+                  ? (langMode === "en" ? "Connecting…" : "連線中…")
+                  : bridge.status === "speaking"
+                    ? (langMode === "en" ? `■ End (AI Speaking ${bridge.seconds}s)` : `■ 結束（AI 回話中 ${bridge.seconds}s）`)
+                    : bridge.status === "thinking"
+                      ? (langMode === "en" ? "■ End (AI Thinking…)" : "■ 結束（AI 思考中…）")
+                      : (langMode === "en" ? `■ End (Connected ${bridge.seconds}s)` : `■ 結束（已連上 ${bridge.seconds}s）`)}
+            </span>
+          </button>
         </div>
       </header>
 
@@ -3042,7 +3089,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* 通話控制列 */}
+            {/* 通話狀態列（連線／結束操作已併到 header 右上角唯一按鈕，這裡只顯示狀態） */}
             <div className="flex justify-between items-center text-[11px] px-1 font-mono">
               <div className="flex items-center gap-1.5">
                 <span
@@ -3065,25 +3112,6 @@ export default function Home() {
                           ? (langMode === "en" ? "Connecting..." : "連線建立中...")
                           : (langMode === "en" ? "Voice Assistant Standby" : "語音助理待命中")}
                 </span>
-              </div>
-              <div>
-                {bridge.status === "idle" || bridge.status === "ended" || bridge.status === "error" ? (
-                  <button
-                    type="button"
-                    onClick={() => void toggleVoiceSession()}
-                    className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px]"
-                  >
-                    {langMode === "en" ? "▶ Connect Voice" : "▶ 連線對話"}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => bridge.endCall()}
-                    className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px]"
-                  >
-                    {langMode === "en" ? "⏹ End Call" : "⏹ 掛斷"}
-                  </button>
-                )}
               </div>
             </div>
 
