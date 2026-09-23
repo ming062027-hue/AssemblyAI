@@ -773,7 +773,33 @@ export default function Home() {
     },
   });
 
+
+  // 3. 監控機台 414 警報狀態，自動推播語音提醒
+  useEffect(() => {
+    if (heartbeat.activeFault === "none") return;
+    
+    // 主動式預警：當機台觸發警報，系統主動發出廣播，接著操作員才呼叫宇宙管家處理
+    const timer = window.setTimeout(() => {
+      let msg = "";
+      if (langMode === "en") {
+        msg = heartbeat.activeFault === "414"
+          ? "System alert. Axis overload detected on Station 4. Please instruct the AI copilot to assist."
+          : `System alert. ${heartbeat.faultTitle} detected.`;
+      } else {
+        msg = heartbeat.activeFault === "414"
+          ? "系統警告：偵測到加工區軸過載。請指示 AI 管家協助處理。"
+          : `系統警告：偵測到 ${heartbeat.faultTitle}。`;
+      }
+      setMvReply(msg);
+      // 使用瀏覽器 TTS 作為「機台內建系統音」（區別於 AssemblyAI 的人聲）
+      speak(msg, langMode);
+      openDialog();
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [heartbeat.activeFault, heartbeat.faultTitle, langMode, speak, openDialog]);
+
   // 開機巡檢：載入後自動掃 5 站＋庫存＋待修單，宇宙開場報告＋問從哪開始。
+
   // 延遲 1.5 秒等 TTS 聲音載入；警報站（M03）存在時直接亮紅燈＋推播。
   useEffect(() => {
     const timer = window.setTimeout(() => {
