@@ -96,7 +96,7 @@ export const PITCH_SLIDES: PitchSlide[] = [
   {
     title: "Team",
     bullets: [
-      "Built by a tooling-industry veteran with 25 years on the machine floor, together with AI-assisted development.",
+      "Built by a tooling-industry veteran with 14 years on the machine floor, together with AI-assisted development.",
       "We know the noise, the gloves, and the wait — VoiceAndon is the helper we wished we had.",
       "Thank you. Questions welcome.",
     ],
@@ -105,7 +105,7 @@ export const PITCH_SLIDES: PitchSlide[] = [
 
 /** Clamp a ?p= value to a valid 1-based page number (pure, unit-testable). */
 export function clampPitchPage(value: unknown, total: number): number {
-  const n = typeof value === "string" ? Number(value) : Number(value);
+  const n = Number(value);
   if (!Number.isFinite(n)) return 1;
   return Math.min(total, Math.max(1, Math.floor(n)));
 }
