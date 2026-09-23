@@ -203,7 +203,7 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
                 window.AudioContext ||
                 (window as unknown as { webkitAudioContext: typeof AudioContext })
                   .webkitAudioContext;
-              audioCtx.current = new AudioCtx({ sampleRate: 24000 });
+              audioCtx.current = new AudioCtx();
             }
             const ctx = audioCtx.current;
             if (ctx.state === "suspended") {
@@ -365,7 +365,7 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
             window.AudioContext ||
             (window as unknown as { webkitAudioContext: typeof AudioContext })
               .webkitAudioContext;
-          const ctx = new AudioCtx({ sampleRate: 24000 });
+          const ctx = new AudioCtx();
           audioCtx.current = ctx;
           playback.current = createPlaybackQueue(ctx, () => {
             setStatus((s) => (s === "speaking" ? "listening" : s));

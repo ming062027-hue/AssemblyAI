@@ -281,7 +281,7 @@ export default function OperatorPage() {
         return;
       }
       micStream.current = stream;
-      const ctx = new AudioContext({ sampleRate: SAMPLE_RATE });
+      const ctx = new AudioContext();
       audioCtx.current = ctx;
       playback.current = createPlaybackQueue(ctx, () => {
         if (statusRef.current === "speaking") setStatus("listening");
@@ -517,7 +517,7 @@ export default function OperatorPage() {
   }
 
   // 真連線（正式模式）：拿一次 token → 連 wss → 之後流程跟 mock 共用 handleMessage。
-  async function connectLive() {
+  async function connectLive(existingToken?: string) {
     setConnError("");
     setChat([]);
     setLog([]);
@@ -527,32 +527,34 @@ export default function OperatorPage() {
     s1Sent.current = false;
     pendingEnd.current = false;
     setStatus("connecting");
-    let token: string;
-    try {
-      const res = await fetch(
-        "/api/voice-token?passcode=" + encodeURIComponent(passcode),
-        { cache: "no-store" },
-      );
-      if (!res.ok) {
-        setConnError(
-          res.status === 401
-            ? "Wrong passcode. Please try again."
-            : "Could not get a voice token. Please try again.",
+    let token = existingToken || "";
+    if (!token) {
+      try {
+        const res = await fetch(
+          "/api/voice-token?passcode=" + encodeURIComponent(passcode),
+          { cache: "no-store" },
         );
+        if (!res.ok) {
+          setConnError(
+            res.status === 401
+              ? "Wrong passcode. Please try again."
+              : "Could not get a voice token. Please try again.",
+          );
+          setStatus("error");
+          return;
+        }
+        const data = (await res.json()) as { token?: unknown };
+        if (typeof data.token !== "string" || data.token.length === 0) {
+          setConnError("Could not get a voice token. Please try again.");
+          setStatus("error");
+          return;
+        }
+        token = data.token;
+      } catch {
+        setConnError("Could not reach the token server. Please try again.");
         setStatus("error");
         return;
       }
-      const data = (await res.json()) as { token?: unknown };
-      if (typeof data.token !== "string" || data.token.length === 0) {
-        setConnError("Could not get a voice token. Please try again.");
-        setStatus("error");
-        return;
-      }
-      token = data.token;
-    } catch {
-      setConnError("Could not reach the token server. Please try again.");
-      setStatus("error");
-      return;
     }
     // token 只用一次，不存、不印。
     push("token ok, opening AssemblyAI connection…");
@@ -561,7 +563,7 @@ export default function OperatorPage() {
   }
 
   async function startCall() {
-    // V1 密語門：先請伺服器驗密語。只看狀態碼，不讀 token、不開 WebSocket。
+    // V1 密語門：先請伺服器驗密語。
     if (!passcode) {
       setPasscodeError("Please enter the demo passcode first.");
       return;
@@ -594,11 +596,18 @@ export default function OperatorPage() {
       setPasscodeError("Request blocked. Please open this page directly.");
       return;
     }
-    // 密語通過。開發模式接 mock；正式模式走真連線（connectLive 會再拿一次 token）。
+    // 密語通過。開發模式接 mock；正式模式走真連線（直接複用驗證時已發放的 token，不重複要 token）。
     if (isDev) {
       connectMock();
     } else {
-      void connectLive();
+      let token = "";
+      try {
+        const data = (await res.json()) as { token?: unknown };
+        if (typeof data.token === "string") token = data.token;
+      } catch {
+        // 若解析失敗，connectLive 會自動重新取得
+      }
+      void connectLive(token);
     }
   }
 
