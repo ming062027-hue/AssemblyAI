@@ -549,41 +549,75 @@ export default function Home() {
 
   // 宇宙開口講話（瀏覽器內建 TTS，免費，固定 zh-TW 女聲、正常語速 rate=1.0；
   // 英文模式改用 en-US 聲音，語速一樣 1.0）。
+  // 大銘 2026-09-23 批准修沙啞疊音：TTS 單一佇列，一次只講一個，後講的排隊等
+  // 前一個講完（utterance.onend 續播），不疊音；cancel()+speak 連發在 Chrome
+  // 會短暫重疊，所以自動觸發一律只排隊，使用者中斷（麥克風/喚醒）才清空取代。
+  const ttsQueue = useRef<{ text: string; lang: "zh" | "en" }[]>([]);
+  const ttsBusy = useRef(false);
+  const pumpTts = useCallback(function pumpTtsInner() {
+    if (ttsBusy.current) return;
+    const next = ttsQueue.current.shift();
+    if (!next) return;
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+      ttsQueue.current = [];
+      return;
+    }
+    try {
+      const synth = window.speechSynthesis;
+      const u = new SpeechSynthesisUtterance(next.text);
+      const voices = synth.getVoices();
+      if (next.lang === "en") {
+        u.lang = "en-US";
+        u.rate = 1.0;
+        const pool = voices.filter((v) => v.lang.toLowerCase().startsWith("en"));
+        const pick =
+          pool.find((v) => /female|google us english|samantha|zira/i.test(v.name)) ??
+          pool.find((v) => /google/i.test(v.name)) ??
+          pool[0];
+        if (pick) u.voice = pick;
+      } else {
+        u.lang = "zh-TW";
+        u.rate = 1.0;
+        const zh = voices.filter((v) => v.lang.toLowerCase().startsWith("zh"));
+        const pool = zh.filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith("zh-tw")).length
+          ? zh.filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith("zh-tw"))
+          : zh;
+          const female =
+            pool.find((v) => /女|美佳|婷婷|female|mei-?jia|ting|yun|hsiao|ying|lin/i.test(v.name)) ??
+          pool.find((v) => /google/i.test(v.name)) ??
+          pool[0];
+        if (female) u.voice = female;
+      }
+      ttsBusy.current = true;
+      const done = () => {
+        if (!ttsBusy.current) return; // 被 ttsCancel 清掉就不續播
+        ttsBusy.current = false;
+        pumpTtsInner();
+      };
+      u.onend = done;
+      u.onerror = done;
+      synth.speak(u);
+    } catch {
+      ttsBusy.current = false;
+    }
+  }, []);
+  // 使用者中斷（按麥克風、嘿宇宙喚醒）：清掉排隊＋停掉正在講的。
+  const ttsCancel = useCallback(() => {
+    ttsQueue.current = [];
+    ttsBusy.current = false;
+    try {
+      if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
+    } catch {
+      // TTS 失敗不致命
+    }
+  }, []);
   const speak = useCallback(
     (text: string, lang: "zh" | "en" = "zh") => {
       if (!voiceOn || typeof window === "undefined" || !window.speechSynthesis) return;
-      try {
-        window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(text);
-        const voices = window.speechSynthesis.getVoices();
-        if (lang === "en") {
-          u.lang = "en-US";
-          u.rate = 1.0;
-          const pool = voices.filter((v) => v.lang.toLowerCase().startsWith("en"));
-          const pick =
-            pool.find((v) => /female|google us english|samantha|zira/i.test(v.name)) ??
-            pool.find((v) => /google/i.test(v.name)) ??
-            pool[0];
-          if (pick) u.voice = pick;
-        } else {
-          u.lang = "zh-TW";
-          u.rate = 1.0;
-          const zh = voices.filter((v) => v.lang.toLowerCase().startsWith("zh"));
-          const pool = zh.filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith("zh-tw")).length
-            ? zh.filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith("zh-tw"))
-            : zh;
-          const female =
-            pool.find((v) => /女|female|mei-?jia|ting|yun|hsiao|ying|lin/i.test(v.name)) ??
-            pool.find((v) => /google/i.test(v.name)) ??
-            pool[0];
-          if (female) u.voice = female;
-        }
-        window.speechSynthesis.speak(u);
-      } catch {
-        // TTS 失敗不致命
-      }
+      ttsQueue.current.push({ text, lang });
+      pumpTts();
     },
-    [voiceOn],
+    [voiceOn, pumpTts],
   );
 
   useEffect(() => {
@@ -614,7 +648,8 @@ export default function Home() {
   useEffect(() => {
     if (bridge.lastAgentSay) {
       openDialog();
-      // 僅在純英文語音代理模式且本地未發聲時才播報英文，避免與中文語音雙重混音
+      // 僅在純英文語音代理模式且本地未發聲時才播報英文，對話框本來就會顯示文字；
+      // speak 內部是單一佇列，主回話還沒講完時這句排隊等，不疊音。
       if (voiceOn && !bridge.isLiveMode && mvCtx.lang === "en") {
         speak(bridge.lastAgentSay, "en");
       }
@@ -767,25 +802,26 @@ export default function Home() {
   useWakeWordListener({
     enabled: wakeEnabled && !mvListening,
     onWake: () => {
-      window.speechSynthesis?.cancel();
+      ttsCancel();
       openDialog();
       const msg = langMode === "en" ? "I am here, please speak." : "我在，請說！";
       setMvReply(msg);
       speak(msg, langMode);
     },
     onCommand: (cmd) => {
-      window.speechSynthesis?.cancel();
+      ttsCancel();
       openDialog();
       sendQuick(cmd);
     },
   });
 
 
-  // 3. 監控機台 414 警報狀態，自動推播語音提醒
+  // 3. 監控機台警報狀態，只顯示文字推播（大銘 2026-09-23 批准：不自動講話，
+  // 對話框照樣彈出；使用者按按鈕/下指令後的回話照常講）。
   useEffect(() => {
     if (heartbeat.activeFault === "none") return;
-    
-    // 主動式預警：當機台觸發警報，系統主動發出廣播，接著操作員才呼叫宇宙管家處理
+
+    // 主動式預警：當機台觸發警報，對話框顯示廣播文字，不用 TTS 自動唸。
     const timer = window.setTimeout(() => {
       let msg = "";
       if (langMode === "en") {
@@ -798,22 +834,20 @@ export default function Home() {
           : `系統警告：偵測到 ${heartbeat.faultTitle}。`;
       }
       setMvReply(msg);
-      // 使用瀏覽器 TTS 作為「機台內建系統音」（區別於 AssemblyAI 的人聲）
-      speak(msg, langMode);
       openDialog();
     }, 800);
     return () => window.clearTimeout(timer);
-  }, [heartbeat.activeFault, heartbeat.faultTitle, langMode, speak, openDialog]);
+  }, [heartbeat.activeFault, heartbeat.faultTitle, langMode, openDialog]);
 
-  // 開機巡檢：載入後自動掃 5 站＋庫存＋待修單，宇宙開場報告＋問從哪開始。
+  // 開機巡檢：載入後自動掃 5 站＋庫存＋待修單，宇宙開場報告只顯示文字
+  // （大銘 2026-09-23 批准：不自動講話，對話框照樣彈出）。
 
-  // 延遲 1.5 秒等 TTS 聲音載入；警報站（M03）存在時直接亮紅燈＋推播。
+  // 延遲 1.5 秒等資料就緒；警報站（M03）存在時直接亮紅燈＋推播文字。
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const open = list().filter((tk) => (tk.status ?? "open") === "open").length;
       const r = buildStartupReport(open, langMode);
       setMvReply(r.text);
-      speak(r.text, langMode);
       if (r.hasAlarm) {
         setIsAlarm(true);
         setView("f1");
@@ -821,16 +855,14 @@ export default function Home() {
       openDialog();
     }, 1500);
     return () => window.clearTimeout(timer);
-    // 只跑一次：開機巡檢。speak/openDialog 是 stable callback。
+    // 只跑一次：開機巡檢。openDialog 是 stable callback。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 點麥克風：用瀏覽器內建語音辨識（Chrome 免費）真的聽你講中文。
   const onMic = useCallback(() => {
-    // 立即中斷先前仍在發聲的開機巡檢或舊語音，避免重疊混音
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
+    // 立即中斷先前仍在發聲的開機巡檢或舊語音（含排隊），避免重疊混音
+    ttsCancel();
     if (liveModeWanted || bridge.isLiveMode) {
       void toggleVoiceSession();
       return;
@@ -878,7 +910,7 @@ export default function Home() {
     } catch {
       setMvListening(false);
     }
-  }, [langMode, liveModeWanted, bridge, passcode, mvListening, toggleVoiceSession, openDialog, runModelCommand]);
+  }, [langMode, liveModeWanted, bridge, passcode, mvListening, toggleVoiceSession, openDialog, runModelCommand, ttsCancel]);
 
   // 浮層夾取：對話框＋球是同一個 fixed 容器，夾的是整個浮層（球在框下方，
   // 只夾容器左上角會讓球掉出螢幕下緣 → 用容器實際寬高反推）。
@@ -2987,7 +3019,7 @@ export default function Home() {
                         setLangMode("zh");
                         const msg = "已切換為繁體中文語音模式。";
                         setMvReply(msg);
-                        speak(msg, langMode);
+                        speak(msg, "zh"); // 中文稿固定用中文聲（舊寫法誤用舊 langMode 會拿英文聲唸中文＝沙啞聲來源之一）
                       }
                     }}
                     title="切換為繁體中文"
