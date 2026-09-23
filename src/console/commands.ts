@@ -148,29 +148,41 @@ export interface StartupReport {
  * ⚠️ 開場白第一句是暫定版：主控說「開場介紹詞照我給的那段」，但派工單沒附原文，
  * 拿到原文後換掉第一句，後面巡檢數字不動。
  */
-export function buildStartupReport(openTickets: number): StartupReport {
+export function buildStartupReport(openTickets: number, lang: "en" | "zh" = "en"): StartupReport {
   const alarm: string[] = [];
   const stopped: string[] = [];
   for (const id of STATION_IDS) {
     const m = get_machine_status({ machine_id: id });
     if ("error" in m) continue;
     if (m.status === "alarm" && m.current_alarm) {
-      alarm.push(`${m.id} 警報 ${m.current_alarm}`);
+      alarm.push(lang === "en" ? `${m.id} alarm ${m.current_alarm}` : `${m.id} 警報 ${m.current_alarm}`);
     } else if (m.status === "stopped") {
       stopped.push(m.id);
     }
   }
   const low = stockWarnings();
-  const lowTxt =
-    low.length === 0
-      ? "原料都在安全線以上"
-      : `原料偏低：${low.map((s) => `${s.id} 剩 ${s.left}`).join("、")}`;
-  const text =
-    `我是 Model宇宙，你的工廠語音管家。開機巡檢完成：` +
-    `${alarm.length ? alarm.join("、") + "，" : "5 站無警報，"}` +
-    `${stopped.length ? stopped.join("、") + "停機中，" : ""}` +
-    `${lowTxt}，目前待修單 ${openTickets} 張。要從哪裡開始？說查警報、開單或催料都可以。`;
-  return { text, hasAlarm: alarm.length > 0 };
+  let lowTxt = "";
+  if (lang === "en") {
+    lowTxt = low.length === 0 ? "Inventory above safety levels" : `Low materials: ${low.map(s => `${s.id} left ${s.left}`).join(', ')}`;
+  } else {
+    lowTxt = low.length === 0 ? "原料都在安全線以上" : `原料偏低：${low.map(s => `${s.id} 剩 ${s.left}`).join('、')}`;
+  }
+  
+  let outText = "";
+  if (lang === "en") {
+    outText = `I am Universe, your factory AI copilot. Startup inspection complete. ` +
+      (alarm.length ? alarm.join(", ") + ". " : "All 5 stations nominal. ") +
+      (stopped.length ? stopped.join(", ") + " stopped. " : "") +
+      `${lowTxt}. ` +
+      (openTickets > 0 ? `${openTickets} open work orders.` : "");
+  } else {
+    outText = `我是 Model宇宙，你的工廠語音管家。開機巡檢完成：` +
+      (alarm.length ? alarm.join("、") + "，" : "5 站無警報，") +
+      (stopped.length ? stopped.join("、") + "停機中，" : "") +
+      `${lowTxt}。` +
+      (openTickets > 0 ? `有 ${openTickets} 張未結保修單。` : "");
+  }
+  return { hasAlarm: alarm.length > 0, text: outText };
 }
 
 /** 異常推播內文：分級＋建議處置＋問要不要切畫面。 */
