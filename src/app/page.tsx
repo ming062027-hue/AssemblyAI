@@ -399,7 +399,7 @@ export default function Home() {
 
   // 🏭 工廠真實心跳動態引擎（G-code 滾動、週期倒數、OEE、停機損失計價、刀具磨損、三大工單、故障演練、品檢、綠能）
   const heartbeat = useFactoryHeartbeat(isAlarm, (alarm) => setIsAlarm(alarm));
-  const [wakeEnabled, setWakeEnabled] = useState(false);
+  // wakeEnabled 舊獨立開關已刪（大銘 2026-09-23 親口定：兩顆合一）：喚醒跟連線狀態走，見 bridge 下方的 wakeEnabled 衍生常數。
 
   // 🌐 國際競賽雙語切換 (zh: 繁體中文現場 / en: International Competition English)
   const [langMode, setLangMode] = useState<"zh" | "en">("en");
@@ -543,6 +543,9 @@ export default function Home() {
       openDialog();
     },
   });
+
+  // 語音喚醒跟官方連線走（大銘 2026-09-23 親口定：兩顆合一）：連上（listening/thinking/speaking）自動開，掛斷（endCall/ended/error）自動關；不分 dev/mock。
+  const wakeEnabled = bridge.status === "listening" || bridge.status === "thinking" || bridge.status === "speaking";
 
   // 宇宙開口講話（瀏覽器內建 TTS，免費，固定 zh-TW 女聲、正常語速 rate=1.0；
   // 英文模式改用 en-US 聲音，語速一樣 1.0）。
@@ -1060,24 +1063,7 @@ export default function Home() {
             </button>
           </div>
 
-          {/* 免接觸「宇宙」語音喚醒開關（直接喊「宇宙」） */}
-          <button
-            type="button"
-            onClick={() => setWakeEnabled((v) => !v)}
-            title={wakeEnabled ? "免觸控語音喚醒中（黑手免碰螢幕，直接喊「宇宙」即可）" : "免觸控語音喚醒已關閉，點擊開啟"}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs font-mono font-semibold transition ${
-              wakeEnabled
-                ? "bg-purple-950/80 border-purple-500 text-purple-200 hover:bg-purple-900"
-                : "bg-slate-800 border-slate-600 text-slate-400 hover:bg-slate-700"
-            }`}
-          >
-            <span className={`w-2 h-2 rounded-full ${wakeEnabled ? "bg-purple-400 animate-pulse" : "bg-slate-500"}`} />
-            <span>
-              {langMode === "en"
-                ? `🎙️ Wake Word: ${wakeEnabled ? "ON ('Universe')" : "OFF"}`
-                : `🎙️ 語音喚醒: ${wakeEnabled ? "ON (喊「宇宙」)" : "OFF"}`}
-            </span>
-          </button>
+          {/* 喚醒已併入右上角 AssemblyAI 連線鍵（大銘 2026-09-23 親口定：兩顆合一）：連上自動開、掛斷自動關；此處不另留開關。 */}
 
           {/* 停機損失即時跳表（老闆視角：每秒都在算錢） */}
           {isAlarm && (
@@ -1113,7 +1099,8 @@ export default function Home() {
           </div>
 
           {/* 全站唯一連線鍵（大銘 2026-09-23 親口定）：中文「AssemblyAI連線」／英文「AssemblyAI Connect」。
-              沒連線顯示連線字樣，連上變結束鍵＋秒數；深色小顆跟 header 融合。 */}
+              沒連線顯示連線字樣，連上變結束鍵＋秒數；深色小顆跟 header 融合。
+              燈號（大銘親口定：未連線絕對不能是綠色）：沒連線（idle/ended/error）灰燈、連線中（connecting）琥珀燈 pulse、連上（listening/thinking/speaking）綠燈。 */}
           <button
             type="button"
             data-testid="header-voice-connect"
@@ -1127,19 +1114,19 @@ export default function Home() {
             title={bridge.error ?? (langMode === "en" ? "Connect voice (production: official / dev: mock)" : "連線語音（正式站官方／本機模擬）")}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs font-mono font-bold transition ${
               bridge.status === "idle" || bridge.status === "ended" || bridge.status === "error"
-                ? "bg-[#14181f] border-emerald-600 text-emerald-300 hover:bg-emerald-950"
+                ? "bg-[#14181f] border-slate-600 text-slate-400 hover:bg-slate-800"
                 : bridge.status === "connecting"
                   ? "bg-[#14181f] border-amber-500 text-amber-300 animate-pulse"
-                  : "bg-[#14181f] border-rose-500 text-rose-300 hover:bg-rose-950"
+                  : "bg-[#14181f] border-emerald-600 text-emerald-300 hover:bg-emerald-950"
             }`}
           >
             <span
               className={`w-2 h-2 rounded-full ${
                 bridge.status === "idle" || bridge.status === "ended" || bridge.status === "error"
-                  ? "bg-emerald-500"
+                  ? "bg-slate-500"
                   : bridge.status === "connecting"
                     ? "bg-amber-500 animate-pulse"
-                    : "bg-rose-500 animate-ping"
+                    : "bg-emerald-500"
               }`}
             />
             <span>
