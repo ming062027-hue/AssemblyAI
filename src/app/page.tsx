@@ -745,8 +745,15 @@ export default function Home() {
       const isEn = langMode === "en";
       const res = interpret(t, mvCtx, { tickets: list(), urges: urgeCount }, isEn);
       setMvCtx(res.context);
+      // 語音喊「切換英文/中文」時 interpret 會改 context.lang；頁面 langMode 跟著走，
+      // 不然這句英文回話會拿舊 langMode 的中文聲來唸（大銘 2026-09-23 回報）。
+      if (res.context.lang !== langMode) {
+        setLangMode(res.context.lang);
+      }
       setMvReply(res.response);
-      speak(res.response, langMode);
+      // 稿件實際語系配對應聲音：含中文字→中文聲，其餘→英文聲。
+      // 舊分支在英文模式下仍可能回中文（commands.ts 開頭註明），不靠 langMode 猜。
+      speak(res.response, /[一-鿿]/.test(res.response) ? "zh" : "en");
       if (res.clearAlarm) {
         setIsAlarm(false); // 跟按鈕/F8 同一個效果
         heartbeat.injectFault("none");
@@ -1056,6 +1063,7 @@ export default function Home() {
               onClick={() => {
                 if (langMode !== "zh") {
                   setLangMode("zh");
+                  setMvCtx((prev) => ({ ...prev, lang: "zh" }));
                   const switchMsg = "已切換為繁體中文現場模式。";
                   setMvReply(switchMsg);
                   speak(switchMsg, "zh");
@@ -1077,6 +1085,7 @@ export default function Home() {
               onClick={() => {
                 if (langMode !== "en") {
                   setLangMode("en");
+                  setMvCtx((prev) => ({ ...prev, lang: "en" }));
                   const switchMsg = "Switched to English voice and console mode.";
                   setMvReply(switchMsg);
                   speak(switchMsg, "en");
@@ -3017,6 +3026,7 @@ export default function Home() {
                     onClick={() => {
                       if (langMode !== "zh") {
                         setLangMode("zh");
+                        setMvCtx((prev) => ({ ...prev, lang: "zh" }));
                         const msg = "已切換為繁體中文語音模式。";
                         setMvReply(msg);
                         speak(msg, "zh"); // 中文稿固定用中文聲（舊寫法誤用舊 langMode 會拿英文聲唸中文＝沙啞聲來源之一）
@@ -3036,6 +3046,7 @@ export default function Home() {
                     onClick={() => {
                       if (langMode !== "en") {
                         setLangMode("en");
+                        setMvCtx((prev) => ({ ...prev, lang: "en" }));
                         const msg = "Switched to English voice mode.";
                         setMvReply(msg);
                         speak(msg, "en");
