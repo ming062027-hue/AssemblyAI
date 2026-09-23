@@ -762,9 +762,9 @@ export default function Home() {
     onWake: () => {
       window.speechSynthesis?.cancel();
       openDialog();
-      const msg = "我在，請說！";
+      const msg = langMode === "en" ? "I am here, please speak." : "我在，請說！";
       setMvReply(msg);
-      speak(msg, "zh");
+      speak(msg, langMode);
     },
     onCommand: (cmd) => {
       window.speechSynthesis?.cancel();
@@ -778,9 +778,9 @@ export default function Home() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const open = list().filter((tk) => (tk.status ?? "open") === "open").length;
-      const r = buildStartupReport(open);
+      const r = buildStartupReport(open, langMode);
       setMvReply(r.text);
-      speak(r.text, "zh");
+      speak(r.text, langMode);
       if (r.hasAlarm) {
         setIsAlarm(true);
         setView("f1");
@@ -2926,7 +2926,7 @@ export default function Home() {
                         setLangMode("zh");
                         const msg = "已切換為繁體中文語音模式。";
                         setMvReply(msg);
-                        speak(msg, "zh");
+                        speak(msg, langMode);
                       }
                     }}
                     title="切換為繁體中文"
