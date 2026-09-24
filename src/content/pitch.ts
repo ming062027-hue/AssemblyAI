@@ -91,7 +91,7 @@ export const PITCH_SLIDES: PitchSlide[] = [
     bullets: [
       "Connect the five-station line (dock, AGVs, machining, QC) to real PLC/MES data; the demo simulates it today.",
       "Chinese voice replies when the platform supports them.",
-      "Connect real machine data and cross-device sync.",
+      "Cross-device sync: the same work-order board on the supervisor's phone and desktop.",
       "Keep the same promise: rescue first, confirm before filing, never invent.",
     ],
   },
