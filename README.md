@@ -1,10 +1,37 @@
 # VoiceAndon
 
-A voice assistant for noisy CNC machine shops, built for the lablab.ai × AssemblyAI Voice Agent Hackathon (September 2026).
+**Hands-free voice help for CNC operators**, built on the [AssemblyAI Voice Agent API](https://www.assemblyai.com/docs) for the lablab.ai × AssemblyAI Voice Agent Hackathon (September 2026).
 
-Operators talk to it right next to a loud machine. They can ask what an alarm means, hear the first checks to try, and open a repair ticket once they have confirmed the details. Supervisors see new tickets on a live dashboard.
+**Live demo:** <https://assembly-ai-sepia.vercel.app>
 
-> **Status (v0.1):** the demo main line is implemented and validated against the AssemblyAI Voice Agent API — an operator speaks, the assistant looks up machine status and alarm codes, and files a repair ticket after the operator confirms, and supervisors see it on a live board. The in-browser microphone capture and audio playback still need an on-device test.
+![VoiceAndon console](docs/cover.png)
+
+Operators talk to it right next to a loud machine. The agent checks the machine, looks up the alarm code, reads back likely causes and the first three checks, and files a repair ticket only after the operator clearly says "yes". Confirmed tickets appear instantly on the live work-order board.
+
+## Try it (about 1 minute)
+
+1. Open the live demo in desktop Chrome.
+2. Click **AssemblyAI Connect** (top right) and allow the microphone. The demo passcode is pre-filled.
+3. Speak English:
+   - "Machine three has an alarm."
+   - "What does alarm 414 mean?"
+   - "I checked. It is still noisy. Please open a repair ticket." → the agent repeats the details → "Yes."
+   - "Ticket RT-1001 is resolved."
+4. Click **End** when you are done. Each session is limited to 5 minutes.
+
+## How AssemblyAI is used
+
+- **Voice Agent API** over WebSocket: speech-to-text, turn-taking, the language model and the spoken reply in one real-time connection.
+- **Voice Focus** (far-field) noise suppression for loud machine floors.
+- **JSON-Schema function tools** that run in the browser: `get_machine_status`, `lookup_alarm`, `get_maintenance_history`, `create_repair_ticket`, `resolve_repair_ticket`, `clear_machine_alarm`, `switch_console_view`, `end_conversation`. Deeper tools unlock only after the machine is confirmed.
+- **Short-lived tokens** issued by our server, so the API key never reaches the browser.
+
+## Design principles
+
+- **Rescue first, ticket second** — help the operator fix simple problems before filing anything.
+- **Never invents** — only numbers, codes and ticket IDs returned by a tool are spoken; unknown alarm codes get "I cannot find it".
+- **Acts only on explicit confirmation** — no ticket without "yes".
+- **Never controls the machine** — voice reads and files; hands stay on the real controls.
 
 ## Demo data
 
@@ -14,40 +41,40 @@ All machines, alarm codes, maintenance records and tickets in this project are *
 
 - [Next.js](https://nextjs.org) 16 (App Router) with TypeScript
 - [Tailwind CSS](https://tailwindcss.com) 4
-- [AssemblyAI Voice Agent API](https://www.assemblyai.com/docs) over WebSocket from the browser, using short-lived tokens issued by our server
+- AssemblyAI Voice Agent API over WebSocket from the browser
+- Deployed on [Vercel](https://vercel.com)
 
-## Getting started
+## Run it locally
 
-Requirements: Node.js 20.9 or later, and an AssemblyAI API key.
+Requirements: Node.js 20.9 or later.
 
 ```bash
 npm install
-cp .env.example .env.local   # then put your AssemblyAI API key in .env.local
-npm run dev
+cp .env.example .env.local   # set ASSEMBLYAI_API_KEY and DEMO_PASSCODE
+npm run dev                  # http://localhost:3000
+node scripts/mock-agent.mjs  # optional: free local mock agent on ws://localhost:8787
 ```
 
-Open <http://localhost:3000>. Use Chrome or Edge for the voice features; the microphone only works on `localhost` or HTTPS.
+In development the console talks to the local mock agent, so you can test the UI without spending API credits. In production it connects to the AssemblyAI Voice Agent API. Use Chrome or Edge; the microphone only works on `localhost` or HTTPS.
 
 ## Project layout
 
-Some of these folders are planned and appear as the build progresses.
-
 | Path | What lives there |
 | --- | --- |
-| `src/app/page.tsx` | Home page |
-| `src/app/dashboard/` | Supervisor dashboard |
-| `src/app/operator/` | Operator voice page (in progress) |
-| `src/app/api/voice-token/` | Server route that issues short-lived AssemblyAI tokens (in progress) |
+| `src/app/page.tsx` | CNC-640 console (the main demo) |
+| `src/app/pitch/` | 10-slide pitch deck (`/pitch`, printable to PDF) |
+| `src/app/api/voice-token/` | Server route that checks the demo passcode and issues short-lived AssemblyAI tokens |
 | `src/voice/` | Voice agent client: audio, WebSocket session, prompts, tool schemas |
-| `public/voice/` | Reserved (currently empty): the audio worklet is embedded inline in `src/voice/audio.ts`, not served as a static file |
 | `src/tools/` | Tool handlers that read the demo data and create tickets |
+| `src/console/` | Console commands and the simulated factory heartbeat |
 | `src/data/` | Fictional demo data |
-| `src/board/` | Dashboard components and ticket sync |
-| `src/config/site.ts` | Site name and version |
+| `src/board/` | Work-order board components and ticket sync |
+| `scripts/mock-agent.mjs` | Local mock of the voice agent for free testing |
 
 ## Security
 
 - The AssemblyAI API key stays on the server in `.env.local`, which is never committed. The browser only receives a short-lived token.
+- The token route requires the demo passcode, and every voice session is capped at 5 minutes.
 
 ## License
 
