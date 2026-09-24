@@ -1,10 +1,12 @@
 // Pitch deck content for the /pitch page (spec 4.8).
 //
-// Text below is copied verbatim from 企劃/簡報文字_v0.1_2026-09-19.md
-// (planning line owns the wording — dashboard line only reshapes it into
-// title + bullets here; do not edit wording in this file, fix it there).
+// Originally copied from 企劃/簡報文字_v0.1_2026-09-19.md. Since 2026-09-24 this
+// file is the source of truth for the deck wording (updated by the 總管 line on
+// 大銘's decisions: USD 19/machine/month pricing; 25 years in machinery, 14 of
+// them in machine tools; single-console product). The v0.1 text file is outdated.
 // All machines, alarm codes and numbers here are fictional sample data
 // written for this demo, except figures explicitly marked with a source.
+// Unsourced figures must be labelled as assumptions.
 
 export type PitchSlide = {
   title: string;
@@ -43,15 +45,15 @@ export const PITCH_SLIDES: PitchSlide[] = [
       "Speak the alarm code: the assistant reads back likely causes and the first three checks from a lookup table.",
       "Fix simple problems on the spot, without waiting.",
       'If the problem survives: the assistant asks symptoms, severity, and whether the machine can keep running, reads the ticket back, and files it only after the operator says yes.',
-      "Every confirmed ticket lands on the supervisor dashboard in real time.",
+      "Every confirmed ticket lands on the live work-order board in real time.",
     ],
   },
   {
     title: "Live demo & Noise Resistance",
     bullets: [
-      "Live Demo: Operator voice page protected by passcode gate. Real-time AssemblyAI Voice Agent API connection.",
-      'Tested under 75dB simulated factory background noise: Voice Focus filters shopfloor rumble while accurately parsing commands.',
-      '"Machine three has an alarm" -> alarm 414 lookup -> troubleshooting checks -> confirmed ticket RT-1001 -> instant LiveBoard update.',
+      'Live demo: one CNC-640 console with a single "AssemblyAI Connect" button, connected in real time to the AssemblyAI Voice Agent API.',
+      "Built for noisy floors: AssemblyAI Voice Focus noise suppression is switched on for the operator microphone.",
+      '"Machine three has an alarm" -> alarm 414 lookup -> troubleshooting checks -> confirmed ticket RT-1001 -> instant work-order board update.',
       '"Ticket RT-1001 is resolved" completes the lifecycle loop, clearing alarms and returning machines to normal status.',
       'Anti-hallucination guarantee: asking about alarm 9999 responds with "cannot find code", never a fabricated answer.',
     ],
@@ -59,10 +61,10 @@ export const PITCH_SLIDES: PitchSlide[] = [
   {
     title: "How it works",
     bullets: [
-      "The operator page requests a short-lived token; the token route checks the passcode and origin.",
+      "The console requests a short-lived token; the token route checks the demo passcode and keeps the API key on the server.",
       "Voice streams to the AssemblyAI voice agent over WebSocket; tools run as functions in the browser.",
-      "Tools read simulated machines, alarms, and maintenance records; tickets sync to the board via localStorage plus BroadcastChannel.",
-      "One browser tab shows the whole story: transcript on the left, live board on the right.",
+      "Tools read simulated machines, alarms, and maintenance records, switch console views, and file or resolve tickets.",
+      "One console shows the whole story: the voice panel, machine telemetry, and the live work-order board.",
     ],
   },
   {
@@ -78,16 +80,16 @@ export const PITCH_SLIDES: PitchSlide[] = [
     title: "Business model & Financial ROI",
     bullets: [
       "Who pays: Plant managers and maintenance supervisors whose KPIs depend on uptime.",
-      "Pricing: SaaS subscription at USD $49/machine/month (Starter) and USD $99/machine/month (Pro with MES/PLC telemetry).",
-      "Immediate ROI: Downtime costs $300 to $36,000/hour. Saving just 10 minutes of machine stoppage per month yields $50+ in recouped value, covering the entire monthly fee (600%+ ROI).",
-      "Serviceable Market (TAM): With ~3.0M global CNC units in operation and 15% digital retrofit readiness (450,000 units), initial TAM = 450,000 × $49 × 12 = USD $264 million/year.",
+      "Pricing: SaaS subscription at USD 19 per machine per month.",
+      "Payback (assumption): if a small shop loses about USD 300 per hour of downtime, saving just 10 minutes a month (about USD 50) already covers the USD 19 fee about 2.6 times. Large plants lose far more: USD 36,000+ per hour [Source: S2].",
+      "Market size (assumption, not yet sourced): about 3.0M CNC machines worldwide, 15% ready to retrofit (450,000 machines) -> 450,000 × USD 19 × 12 = about USD 102.6 million per year.",
       "Context: Taiwan machine-tool output was NTD 89.89B in 2025 [Source: S4, ITRI IEK] with exports of USD 2.004B [Source: S1]; Taiwan fields 302 industrial robots per 10k manufacturing workers [Source: S5, IFR 2026].",
     ],
   },
   {
     title: "Future work",
     bullets: [
-      "Extend single machines to the full line: material checks and voice reordering across five stations (A-1 flow; code not in this release).",
+      "Connect the five-station line (dock, AGVs, machining, QC) to real PLC/MES data; the demo simulates it today.",
       "Chinese voice replies when the platform supports them.",
       "Connect real machine data and cross-device sync.",
       "Keep the same promise: rescue first, confirm before filing, never invent.",
@@ -96,7 +98,7 @@ export const PITCH_SLIDES: PitchSlide[] = [
   {
     title: "Team",
     bullets: [
-      "Built by a tooling-industry veteran with 14 years on the machine floor, together with AI-assisted development.",
+      "Built by a machinery veteran: 25 years in the industry, 14 of them in machine tools, together with AI-assisted development.",
       "We know the noise, the gloves, and the wait — VoiceAndon is the helper we wished we had.",
       "Thank you. Questions welcome.",
     ],
