@@ -30,7 +30,7 @@ Operators talk to it right next to a loud machine. The agent checks the machine,
 
 - **Rescue first, ticket second** — help the operator fix simple problems before filing anything.
 - **Never invents** — only numbers, codes and ticket IDs returned by a tool are spoken; unknown alarm codes get "I cannot find it".
-- **Acts only on explicit confirmation** — no ticket without "yes".
+- **Acts only on explicit confirmation** — no ticket without "yes". This is enforced in code, not just in the prompt: before filing a ticket or clearing an alarm, the browser checks that the operator's last words were a clear "yes" ([`src/voice/confirmGate.ts`](src/voice/confirmGate.ts)); otherwise the tool call is refused and the agent reads the details back again.
 - **Never controls the machine** — voice reads and files; hands stay on the real controls.
 
 ## Roadmap: a safe path to machine actions
