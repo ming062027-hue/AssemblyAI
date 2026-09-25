@@ -15,6 +15,8 @@
 // 客戶端把 {"type":"mock.say","text":"..."} 當作操作員講了一句話；
 // 結束時送 {"type":"session.end"}。input.audio 會直接忽略（模擬層不聽真聲音）。
 
+import { isOperatorYes } from "../src/voice/confirmGate.ts";
+
 const PORT = 8787;
 const newSessionId = () => `mock-session-${Date.now().toString(36)}`;
 let callSeq = 0;
@@ -40,8 +42,11 @@ function wordsToDigits(text) {
 // 關鍵字路由（純函式，不碰網路，--self-test 直接測這一支）。
 // 順序有講究：先把「machine three」這種機台指稱拿掉，剩下的數字才算警報碼，
 // 不然 "Machine three has an alarm." 裡的 three 會被誤判成警報碼 3。
-function route(text) {
+// awaiting：上一句 AI 在等哪種確認（"ticket"／"clear_alarm"），由連線那邊記住再傳進來。
+// 開單、清警報一律「先複述、操作員說 yes／是 才執行」，跟網頁的確認關卡（src/voice/confirmGate.ts）同一套判斷。
+function route(text, awaiting = null) {
   const lower = String(text ?? "").toLowerCase();
+  const yes = isOperatorYes(String(text ?? ""));
 
   if (lower.includes("that's all") || lower.includes("that is all")) {
     return {
@@ -53,6 +58,15 @@ function route(text) {
   }
 
   if (/(clear|reset).*alarm|alarm.*(clear|reset)|解除.*警報/.test(lower)) {
+    if (!yes) {
+      return {
+        action: "ask_clear_alarm",
+        tool: null,
+        arguments: null,
+        awaiting: "clear_alarm",
+        agent: ["I will clear alarm 414 on machine 3. Say yes to confirm."],
+      };
+    }
     return {
       action: "clear_alarm",
       tool: "clear_machine_alarm",
@@ -74,6 +88,20 @@ function route(text) {
   }
 
   if (lower.includes("開立維修單") || lower.includes("維修單") || lower.includes("開單") || lower.includes("報修") || lower.includes("open a ticket") || lower.includes("repair ticket")) {
+    if (!yes) {
+      const zh = /[\u4e00-\u9fff]/.test(lower);
+      return {
+        action: "repair",
+        tool: "get_maintenance_history",
+        arguments: { machine_id: "M03", limit: 3 },
+        awaiting: "ticket",
+        agent: [
+          zh
+            ? "我先複述：機台 M03，414 軸過載，嚴重度高，不能繼續生產。請說「是」確認，我才開單。"
+            : "Let me read back: machine 3, spindle grinding noise, high, cannot keep running. Say yes to confirm.",
+        ],
+      };
+    }
     return {
       action: "create_ticket",
       tool: "create_repair_ticket",
@@ -189,6 +217,7 @@ function route(text) {
 
   if (lower.includes("repair") || lower.includes("ticket")) {
     return {
+      awaiting: "ticket",
       action: "repair",
       tool: "get_maintenance_history",
       arguments: { machine_id: "M03", limit: 3 },
@@ -201,7 +230,16 @@ function route(text) {
     };
   }
 
-  if (/\byes\b/.test(lower)) {
+  if (yes && awaiting === "clear_alarm") {
+    return {
+      action: "clear_alarm",
+      tool: "clear_machine_alarm",
+      arguments: { machine_id: "M03" },
+      agent: ["Machine alarm has been cleared and reset. System status returned to normal."],
+    };
+  }
+
+  if (yes) {
     return {
       action: "confirm",
       tool: "create_repair_ticket",
@@ -232,6 +270,9 @@ function isAlarmNotFound(toolResult) {
 }
 
 function decideAgentText(r, toolResultMsg) {
+  if (toolResultMsg?.is_error && (r.tool === "create_repair_ticket" || r.tool === "clear_machine_alarm")) {
+    return ["Not done yet. Please say yes to confirm first."];
+  }
   if (r.action === "alarm" && r.agentNotFound) {
     let parsed = null;
     try {
@@ -298,7 +339,21 @@ function runSelfTest() {
   eq("arm -> switch_console_view f3", [r.tool, r.arguments?.view], ["switch_console_view", "f3"]);
 
   r = route("Clear machine alarm.");
-  eq("clear alarm -> clear_machine_alarm", [r.tool, r.arguments?.machine_id], ["clear_machine_alarm", "M03"]);
+  eq("clear alarm 沒說 yes -> 先問、不送 tool", [r.tool, r.awaiting], [null, "clear_alarm"]);
+  r = route("Yes.", "clear_alarm");
+  eq("等清警報時說 yes -> clear_machine_alarm", [r.tool, r.arguments?.machine_id], ["clear_machine_alarm", "M03"]);
+  r = route("Yes, clear the alarm.");
+  eq("yes + clear alarm -> clear_machine_alarm", r.tool, "clear_machine_alarm");
+
+  r = route("幫我開單");
+  eq("中文開單沒說是 -> 先複述（查維修紀錄）", [r.tool, r.awaiting], ["get_maintenance_history", "ticket"]);
+  r = route("是", "ticket");
+  eq("中文說是 -> create_repair_ticket", r.tool, "create_repair_ticket");
+  eq(
+    "開單被確認關卡擋下 -> 照實說還沒做",
+    decideAgentText(route("Yes, confirm."), { result: JSON.stringify({ error: "NOT DONE" }), is_error: true }),
+    ["Not done yet. Please say yes to confirm first."],
+  );
 
   r = route("That's all, thanks.");
   eq("that's-all -> end_conversation", r.tool, "end_conversation");
@@ -331,6 +386,7 @@ async function startServer() {
   wss.on("connection", (ws) => {
     const sessionId = newSessionId();
     let pending = null; // 還沒回 tool.result 的那一通 { callId, route }
+    let awaiting = null; // 上一句在等哪種確認（"ticket"／"clear_alarm"）
     console.log(`[mock-agent] connected, session ${sessionId}`);
 
     const send = (obj) => ws.send(JSON.stringify(obj));
@@ -353,7 +409,8 @@ async function startServer() {
       if (msg.type === "mock.say") {
         const text = String(msg.text ?? "");
         send({ type: "transcript.user", text });
-        const r = route(text);
+        const r = route(text, awaiting);
+        awaiting = r.awaiting ?? null;
         if (!r.tool) {
           for (const line of r.agent) send({ type: "transcript.agent", text: line });
           send({ type: "reply.audio", data: silenceB64() }); // 官方格式：聲音在 data 欄位（2026-09-25 總管對過文件）

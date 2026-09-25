@@ -26,6 +26,7 @@ import {
   shouldUpgradeToS1,
   type IncomingMessage,
 } from "./client";
+import { createConfirmGate } from "./confirmGate";
 
 export type AgentStatus =
   | "idle"
@@ -71,6 +72,8 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
   const s1Sent = useRef(false);
   const pendingEnd = useRef(false);
   const liveRef = useRef(false);
+  // 開單、清警報前，程式自己確認操作員剛剛真的說了 yes（不只靠 AI 自律，見 confirmGate.ts）
+  const confirmGate = useRef(createConfirmGate());
 
   // Audio capture and playback
   const audioCtx = useRef<AudioContext | null>(null);
@@ -151,6 +154,7 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
     stopAudio();
     stopTimer();
     liveRef.current = false;
+    confirmGate.current.reset();
     setStatus("idle");
     setSeconds(0);
     setSessionId("");
@@ -234,6 +238,7 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
 
       if (msg.type === "transcript.user") {
         const text = String(msg.text ?? "");
+        confirmGate.current.onUserTranscript(text);
         setLastUserSay(text);
         setChat((prev) => [...prev, { who: "you", text }]);
         return;
@@ -241,6 +246,7 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
 
       if (msg.type === "transcript.agent") {
         const text = String(msg.text ?? "");
+        confirmGate.current.onAgentTranscript();
         setLastAgentSay(text);
         setChat((prev) => [...prev, { who: "agent", text }]);
         return;
@@ -251,8 +257,12 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
         const callName = String(msg.name ?? "");
         const callArgs = msg.arguments ?? {};
         let result: Record<string, unknown> = {};
+        const gate = confirmGate.current.check(callName);
 
-        if (onToolCallRef.current) {
+        if (!gate.allowed) {
+          // 操作員還沒說 yes：不執行，把原因回給 AI，讓它先複述再問一次
+          result = { error: gate.error };
+        } else if (onToolCallRef.current) {
           try {
             result = await onToolCallRef.current(callName, callArgs);
           } catch (err) {

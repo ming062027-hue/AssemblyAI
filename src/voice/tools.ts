@@ -100,7 +100,7 @@ export const TOOLS_S0 = [
   {
     type: "function",
     name: "clear_machine_alarm",
-    description: "Clear or reset the active machine alarm on the CNC console, restoring normal status.",
+    description: "Clear or reset the active machine alarm on the CNC console display, restoring normal status. Call only after the operator said yes; the app refuses otherwise.",
     parameters: {
       type: "object",
       properties: {
@@ -122,7 +122,7 @@ export const TOOLS_S1 = [
   {
     type: "function",
     name: "create_repair_ticket",
-    description: "Create a formal repair request for a machine. Requires operator confirmation.",
+    description: "Create a formal repair request for a machine. Call only after you read the details back and the operator said yes; the app refuses the ticket otherwise.",
     parameters: {
       type: "object",
       properties: {
@@ -151,7 +151,7 @@ export const TOOLS_S1 = [
         },
         operator_confirmed: {
           type: "string",
-          description: "Must be 'yes' to indicate the operator has confirmed the details.",
+          description: "Set to 'yes' only after the operator said yes to your read-back of the details.",
           enum: ["yes"],
           examples: ["yes"]
         }

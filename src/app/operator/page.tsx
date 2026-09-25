@@ -45,6 +45,7 @@ import {
   lookup_alarm,
   resolve_repair_ticket,
 } from "@/tools/handlers";
+import { createConfirmGate } from "@/voice/confirmGate";
 import {
   startFactoryNoise,
   stopFactoryNoise,
@@ -175,6 +176,8 @@ export default function OperatorPage() {
   statusRef.current = status;
   // 真連線才用的聲音資源（mock 不用麥克風也不播音）。
   const liveRef = useRef(false);
+  // 開單前，程式自己確認操作員剛剛真的說了 yes（見 voice/confirmGate.ts）
+  const confirmGate = useRef(createConfirmGate());
   const audioCtx = useRef<AudioContext | null>(null);
   const micStream = useRef<MediaStream | null>(null);
   const capture = useRef<CaptureHandle | null>(null);
@@ -332,11 +335,13 @@ export default function OperatorPage() {
       return;
     }
     if (msg.type === "transcript.user") {
+      confirmGate.current.onUserTranscript(String(msg.text ?? ""));
       setChat((prev) => [...prev, { who: "you", text: String(msg.text ?? "") }]);
       push(`down: transcript.user ${JSON.stringify(msg.text ?? "")}`);
       return;
     }
     if (msg.type === "transcript.agent") {
+      confirmGate.current.onAgentTranscript();
       setChat((prev) => [
         ...prev,
         { who: "agent", text: String(msg.text ?? "") },
@@ -347,7 +352,10 @@ export default function OperatorPage() {
     if (msg.type === "tool.call") {
       setStatus("thinking");
       push(`down: tool.call ${msg.name} ${JSON.stringify(msg.arguments ?? {})}`);
-      const result = runTool(String(msg.name ?? ""), msg.arguments ?? {});
+      const gate = confirmGate.current.check(String(msg.name ?? ""));
+      const result = gate.allowed
+        ? runTool(String(msg.name ?? ""), msg.arguments ?? {})
+        : { error: gate.error };
       const toolName = String(msg.name ?? "");
       if (toolName === "get_machine_status" && msg.arguments?.machine_id) {
         setActiveMachine(String(msg.arguments.machine_id));
@@ -514,6 +522,7 @@ export default function OperatorPage() {
     setSeconds(0);
     s1Sent.current = false;
     pendingEnd.current = false;
+    confirmGate.current.reset();
     openSocket(MOCK_URL, false);
   }
 
@@ -527,6 +536,7 @@ export default function OperatorPage() {
     setSeconds(0);
     s1Sent.current = false;
     pendingEnd.current = false;
+    confirmGate.current.reset();
     setStatus("connecting");
     let token = existingToken || "";
     if (!token) {
