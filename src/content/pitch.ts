@@ -87,12 +87,13 @@ export const PITCH_SLIDES: PitchSlide[] = [
     ],
   },
   {
-    title: "Future work",
+    title: "Roadmap: a safe path to machine actions",
     bullets: [
-      "Connect the five-station line (dock, AGVs, machining, QC) to real PLC/MES data; the demo simulates it today.",
-      "Chinese voice replies when the platform supports them.",
-      "Cross-device sync: the same work-order board on the supervisor's phone and desktop.",
-      "Keep the same promise: rescue first, confirm before filing, never invent.",
+      "Step 1 (today): read machine data, advise, and file tickets only after the operator says yes.",
+      "Step 2: low-risk actions (order material, schedule maintenance, notify a technician), each confirmed by a person.",
+      "Step 3: safe commands through the PLC, such as feed hold, with spoken confirmation and hardware safety interlocks; the emergency stop always stays in human hands.",
+      "Step 4: automatic handling of well-defined cases, fully logged and auditable.",
+      "Also planned: Chinese voice replies, and the same work-order board on the supervisor's phone and desktop.",
     ],
   },
   {

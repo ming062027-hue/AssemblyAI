@@ -33,6 +33,15 @@ Operators talk to it right next to a loud machine. The agent checks the machine,
 - **Acts only on explicit confirmation** — no ticket without "yes".
 - **Never controls the machine** — voice reads and files; hands stay on the real controls.
 
+## Roadmap: a safe path to machine actions
+
+AI that acts on machines is where the industry is heading, so we plan to get there step by step, with a person in the loop:
+
+1. **Today** — read machine data, advise, and file tickets only after the operator says "yes".
+2. **Next** — low-risk actions (order material, schedule maintenance, notify a technician), each confirmed by a person.
+3. **Then** — safe commands through the PLC, such as feed hold, with spoken confirmation and hardware safety interlocks. The emergency stop always stays in human hands.
+4. **Later** — automatic handling of well-defined cases, fully logged and auditable.
+
 ## Demo data
 
 All machines, alarm codes, maintenance records and tickets in this project are **fictional sample data** written for the demo. They are not copied from any manufacturer manual and do not describe any real machine, brand or company.
