@@ -173,6 +173,7 @@ export async function startCapture(
 // 播放排隊用到的最小 AudioContext 形狀（只列真的會用到的，方便 Node 用假物件單測）。
 export interface MinimalAudioContext {
   readonly sampleRate: number;
+  readonly currentTime: number;
   readonly destination: unknown;
   createBuffer(channels: number, length: number, sampleRate: number): {
     getChannelData(channel: number): Float32Array;
@@ -183,7 +184,7 @@ export interface MinimalAudioContext {
 // 播放用的最小聲音節點形狀（onended 各家簽名不同，只當未知屬性搬運）。
 export interface MinimalSourceNode {
   connect(dest: unknown): void;
-  start(): void;
+  start(when?: number): void;
   stop(): void;
   buffer: unknown;
   onended: unknown;
@@ -201,73 +202,65 @@ export interface PlaybackQueue {
   dispose(): void;
 }
 
-// 收到 reply.audio 就排隊播放（§4.4）。播完一個自動播下一個，
-// 全部播完呼叫 onEmpty（畫面切回 listening）。
+// 第一段開播前留一點緩衝，吸收網路送來的時間差（人耳聽不出 50 毫秒的延遲）。
+export const PLAYBACK_START_LEAD_S = 0.05;
+
+// 收到 reply.audio 就排隊播放（§4.4），全部播完呼叫 onEmpty（畫面切回 listening）。
+// 2026-09-25 總管修「AI 講話沙啞」：以前是前一段 onended 之後才 start() 下一段，
+// 每段之間至少空一個音訊處理週期（48kHz 約 2.7 毫秒，主執行緒忙時更久）。
+// AssemblyAI 的聲音是一小段一小段送來的，一秒斷幾十次，聽起來就沙沙的。
+// 現在改成收到就把開始時間排好：下一段接在上一段結尾，無縫接播。
 export function createPlaybackQueue(
   ctx: MinimalAudioContext,
   onEmpty: () => void,
 ): PlaybackQueue {
-  const waiting: string[] = [];
-  let current: MinimalSourceNode | null = null;
+  const active = new Set<MinimalSourceNode>();
+  let nextStart = 0;
   let disposed = false;
 
-  function pump() {
-    if (disposed || current) return;
-    const next = waiting.shift();
-    if (next === undefined) {
-      onEmpty();
-      return;
+  function stopAll(): number {
+    const dropped = active.size;
+    for (const src of active) {
+      setOnEnded(src, null);
+      try {
+        src.stop();
+      } catch {
+        // 已經停了就不用再停。
+      }
     }
-    const pcm = base64ToPCM16(next);
-    const buf = ctx.createBuffer(1, Math.max(1, pcm.length), SAMPLE_RATE);
-    const ch = buf.getChannelData(0);
-    for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(ctx.destination);
-    current = src;
-    setOnEnded(src, () => {
-      if (current === src) current = null;
-      pump();
-    });
-    src.start();
+    active.clear();
+    nextStart = 0;
+    return dropped;
   }
 
   return {
     enqueue(audioB64: string): number {
       if (disposed) return 0;
-      waiting.push(audioB64);
-      pump();
-      return waiting.length + (current ? 1 : 0);
+      const pcm = base64ToPCM16(audioB64);
+      const length = Math.max(1, pcm.length);
+      const buf = ctx.createBuffer(1, length, SAMPLE_RATE);
+      const ch = buf.getChannelData(0);
+      for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      const now = ctx.currentTime;
+      const startAt = nextStart > now ? nextStart : now + PLAYBACK_START_LEAD_S;
+      nextStart = startAt + length / SAMPLE_RATE;
+      active.add(src);
+      setOnEnded(src, () => {
+        active.delete(src);
+        if (active.size === 0 && !disposed) onEmpty();
+      });
+      src.start(startAt);
+      return active.size;
     },
     stopAndClear(): number {
-      const dropped = waiting.length + (current ? 1 : 0);
-      waiting.length = 0;
-      const playing = current;
-      current = null;
-      if (playing) {
-        setOnEnded(playing, null);
-        try {
-          playing.stop();
-        } catch {
-          // 已經停了就不用再停。
-        }
-      }
-      return dropped;
+      return stopAll();
     },
     dispose() {
       disposed = true;
-      waiting.length = 0;
-      const playing = current;
-      current = null;
-      if (playing) {
-        setOnEnded(playing, null);
-        try {
-          playing.stop();
-        } catch {
-          // 收尾，忽略。
-        }
-      }
+      stopAll();
     },
   };
 }
