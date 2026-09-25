@@ -322,9 +322,11 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
   const startCall = useCallback(
     async (passcode?: string, forceLive?: boolean): Promise<boolean> => {
       const useLive = forceLive !== undefined ? forceLive : !isDev;
+      // 先重設、再設定模式：reset() 會把 liveRef 清成 false。以前順序相反，
+      // 真連線時 liveRef 永遠是 false → session.ready 後麥克風從不收音（總管 2026-09-25 實測抓到）。
+      reset();
       setIsLiveMode(useLive);
       liveRef.current = useLive;
-      reset();
       setStatus("connecting");
       s1Sent.current = false;
       pendingEnd.current = false;
