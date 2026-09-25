@@ -202,6 +202,16 @@ export interface PlaybackQueue {
   dispose(): void;
 }
 
+// 從 reply.audio 訊息取出 AI 的聲音（base64 PCM16）。
+// 官方格式把聲音放在 data 欄位（docs voice-agent-api/events-reference，2026-09-25 總管查證）；
+// 以前前端讀 audio 欄位，真連線時 AI 的聲音一直沒播出來。舊版 mock 用 audio，兩個都收。
+export function replyAudioOf(msg: unknown): string | null {
+  const m = (msg ?? {}) as { data?: unknown; audio?: unknown };
+  if (typeof m.data === "string" && m.data.length > 0) return m.data;
+  if (typeof m.audio === "string" && m.audio.length > 0) return m.audio;
+  return null;
+}
+
 // 第一段開播前留一點緩衝，吸收網路送來的時間差（人耳聽不出 50 毫秒的延遲）。
 export const PLAYBACK_START_LEAD_S = 0.05;
 

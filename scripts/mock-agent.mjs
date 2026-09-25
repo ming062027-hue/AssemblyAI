@@ -356,7 +356,7 @@ async function startServer() {
         const r = route(text);
         if (!r.tool) {
           for (const line of r.agent) send({ type: "transcript.agent", text: line });
-          send({ type: "reply.audio", audio: silenceB64() });
+          send({ type: "reply.audio", data: silenceB64() }); // 官方格式：聲音在 data 欄位（2026-09-25 總管對過文件）
           send({ type: "reply.done" });
           return;
         }
@@ -374,7 +374,7 @@ async function startServer() {
         const lines = decideAgentText(pending.route, msg);
         pending = null;
         for (const line of lines) send({ type: "transcript.agent", text: line });
-        send({ type: "reply.audio", audio: silenceB64() });
+        send({ type: "reply.audio", data: silenceB64() }); // 官方格式：聲音在 data 欄位（2026-09-25 總管對過文件）
         send({ type: "reply.done" });
         return;
       }

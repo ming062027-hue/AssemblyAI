@@ -16,6 +16,7 @@ import {
   makeTestToneB64,
   createPlaybackQueue,
   PLAYBACK_START_LEAD_S,
+  replyAudioOf,
 } from "./audio.ts";
 
 describe("voice/audio pure functions", () => {
@@ -131,5 +132,22 @@ describe("voice/audio gapless playback queue", () => {
     assert.ok(sources.every((s) => s.stopped && s.onended === null));
     q.enqueue(chunk40ms());
     assert.ok(close(sources[3].startedAt, 2.0 + PLAYBACK_START_LEAD_S));
+  });
+});
+
+// reply.audio field (總管 2026-09-25): the official API puts the audio in `data`;
+// the frontend used to read `audio`, so the real agent voice was never played.
+describe("voice/audio replyAudioOf", () => {
+  it("11. reads the official data field", () => {
+    assert.equal(replyAudioOf({ type: "reply.audio", data: "AAAA" }), "AAAA");
+  });
+  it("12. still accepts the old mock audio field", () => {
+    assert.equal(replyAudioOf({ type: "reply.audio", audio: "BBBB" }), "BBBB");
+  });
+  it("13. prefers data when both exist; returns null when missing or empty", () => {
+    assert.equal(replyAudioOf({ data: "CC", audio: "DD" }), "CC");
+    assert.equal(replyAudioOf({ type: "reply.audio" }), null);
+    assert.equal(replyAudioOf({ data: "" }), null);
+    assert.equal(replyAudioOf(null), null);
   });
 });

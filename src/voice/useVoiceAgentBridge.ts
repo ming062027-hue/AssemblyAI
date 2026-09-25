@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   base64ToPCM16,
   createPlaybackQueue,
+  replyAudioOf,
   startCapture,
   type CaptureHandle,
   type PlaybackQueue,
@@ -282,8 +283,8 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
       }
 
       if (msg.type === "reply.audio") {
-        const rawAudio = (msg as unknown as { audio?: unknown }).audio;
-        if (playback.current && typeof rawAudio === "string") {
+        const rawAudio = replyAudioOf(msg);
+        if (playback.current && rawAudio) {
           const pcm = base64ToPCM16(rawAudio);
           if (pcm.length > 0) {
             setStatus("speaking");

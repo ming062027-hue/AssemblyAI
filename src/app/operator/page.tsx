@@ -20,6 +20,7 @@ import {
   base64ToPCM16,
   createMicStream,
   createPlaybackQueue,
+  replyAudioOf,
   startCapture,
   type CaptureHandle,
   type PlaybackQueue,
@@ -405,9 +406,9 @@ export default function OperatorPage() {
     }
     if (msg.type === "reply.audio") {
       // §4.4 插話／播放：真連線排隊播放；mock 只送 0.2 秒靜音，跳過播放。
-      // 聲音本體在 audio 欄位（mock 和真系統同一形狀）。
-      const rawAudio = (msg as unknown as { audio?: unknown }).audio;
-      if (playback.current && typeof rawAudio === "string") {
+      // 聲音本體：真系統在 data 欄位、舊 mock 在 audio 欄位（replyAudioOf 兩個都收）。
+      const rawAudio = replyAudioOf(msg);
+      if (playback.current && rawAudio) {
         const pcm = base64ToPCM16(rawAudio);
         if (pcm.length > 0) {
           setStatus("speaking");
