@@ -305,7 +305,9 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
       }
 
       if (isNormalReplyDone(msg)) {
-        setStatus("listening");
+        // reply.done 常比聲音播完早好幾秒：喇叭還在播就維持 speaking，播完由 onEmpty 切回 listening
+        //（首頁靠 speaking 判斷「AI 在講話，喚醒詞先別聽」，總管 2026-09-27）。
+        setStatus(playback.current?.isPlaying() ? "speaking" : "listening");
         if (pendingEnd.current) {
           pendingEnd.current = false;
           endCall();

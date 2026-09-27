@@ -199,6 +199,9 @@ export interface PlaybackQueue {
   enqueue(audioB64: string): number;
   // 插話時呼叫：立刻停掉正在播的並清空排隊；回傳清掉幾個。
   stopAndClear(): number;
+  // 喇叭還在播 AI 的聲音嗎（排了但還沒播完的也算）。
+  // AssemblyAI 的 reply.done 常比聲音播完早好幾秒，要知道 AI 是不是還在講，看這個。
+  isPlaying(): boolean;
   dispose(): void;
 }
 
@@ -267,6 +270,9 @@ export function createPlaybackQueue(
     },
     stopAndClear(): number {
       return stopAll();
+    },
+    isPlaying(): boolean {
+      return active.size > 0;
     },
     dispose() {
       disposed = true;

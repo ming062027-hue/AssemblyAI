@@ -18,6 +18,7 @@ import {
 import { subscribe, list, type Ticket } from "@/board/ticketStore";
 import { useVoiceAgentBridge } from "@/voice/useVoiceAgentBridge";
 import { useWakeWordListener, playWakeChime } from "@/voice/wakeWord";
+import { isVoiceSessionActive, pickTtsVoice } from "@/voice/ttsVoice";
 import {
   useFactoryHeartbeat,
   formatSecondsToMS,
@@ -561,11 +562,17 @@ export default function Home() {
   // 大銘 2026-09-23 批准修沙啞疊音：TTS 單一佇列，一次只講一個，後講的排隊等
   // 前一個講完（utterance.onend 續播），不疊音；cancel()+speak 連發在 Chrome
   // 會短暫重疊，所以自動觸發一律只排隊，使用者中斷（麥克風/喚醒）才清空取代。
-  const ttsQueue = useRef<{ text: string; lang: "zh" | "en" }[]>([]);
+  // 2026-09-27 總管修「按按鈕有沙啞聲」：以前聲音清單還沒載入（空的）就不指定聲音，
+  // Chrome 自己挑到 macOS 英文清單第一個 Albert（沙啞老人聲，大銘聽比對音檔確認）。
+  // 現在只用 pickTtsVoice 挑出的好聲音；清單還沒載入就先等，挑不到就不講（只顯示文字）。
+  const ttsQueue = useRef<{ text: string; lang: "zh" | "en"; at: number }[]>([]);
   const ttsBusy = useRef(false);
+  const ttsVoices = useRef<SpeechSynthesisVoice[]>([]);
   const pumpTts = useCallback(function pumpTtsInner() {
     if (ttsBusy.current) return;
-    const next = ttsQueue.current.shift();
+    // 排太久的（等聲音清單時累積的）就不講了，免得晚好幾秒才冒出來
+    while (ttsQueue.current.length && Date.now() - ttsQueue.current[0].at > 8000) ttsQueue.current.shift();
+    const next = ttsQueue.current[0];
     if (!next) return;
     if (typeof window === "undefined" || !window.speechSynthesis) {
       ttsQueue.current = [];
@@ -573,30 +580,18 @@ export default function Home() {
     }
     try {
       const synth = window.speechSynthesis;
-      const u = new SpeechSynthesisUtterance(next.text);
-      const voices = synth.getVoices();
-      if (next.lang === "en") {
-        u.lang = "en-US";
-        u.rate = 1.0;
-        const pool = voices.filter((v) => v.lang.toLowerCase().startsWith("en"));
-        const pick =
-          pool.find((v) => /female|google us english|samantha|zira/i.test(v.name)) ??
-          pool.find((v) => /google/i.test(v.name)) ??
-          pool[0];
-        if (pick) u.voice = pick;
-      } else {
-        u.lang = "zh-TW";
-        u.rate = 1.0;
-        const zh = voices.filter((v) => v.lang.toLowerCase().startsWith("zh"));
-        const pool = zh.filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith("zh-tw")).length
-          ? zh.filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith("zh-tw"))
-          : zh;
-          const female =
-            pool.find((v) => /女|美佳|婷婷|female|mei-?jia|ting|yun|hsiao|ying|lin/i.test(v.name)) ??
-          pool.find((v) => /google/i.test(v.name)) ??
-          pool[0];
-        if (female) u.voice = female;
+      if (!ttsVoices.current.length) ttsVoices.current = synth.getVoices();
+      if (!ttsVoices.current.length) return; // 聲音清單還沒載入：留在隊伍裡，voiceschanged 時再講
+      ttsQueue.current.shift();
+      const voice = pickTtsVoice(ttsVoices.current, next.lang);
+      if (!voice) {
+        pumpTtsInner(); // 這台沒有好聲音：這句不講，只顯示文字
+        return;
       }
+      const u = new SpeechSynthesisUtterance(next.text);
+      u.voice = voice;
+      u.lang = voice.lang;
+      u.rate = 1.0;
       ttsBusy.current = true;
       const done = () => {
         if (!ttsBusy.current) return; // 被 ttsCancel 清掉就不續播
@@ -620,14 +615,35 @@ export default function Home() {
       // TTS 失敗不致命
     }
   }, []);
+  // 語音連線（AssemblyAI 或本機 mock）進行中：本機助理只顯示文字、不出聲，只留 AI 一個聲音。
+  // 以前本機聲音從喇叭出來又被麥克風收進去，AI 以為有人講話也跟著回＝「兩個聲音一起出來」
+  //（大銘 2026-09-27 回報並選「只留 AI 一個聲音」）。
+  const voiceSessionActive = useRef(false);
   const speak = useCallback(
     (text: string, lang: "zh" | "en" = "zh") => {
-      if (!voiceOn || typeof window === "undefined" || !window.speechSynthesis) return;
-      ttsQueue.current.push({ text, lang });
+      if (!voiceOn || voiceSessionActive.current || typeof window === "undefined" || !window.speechSynthesis) return;
+      ttsQueue.current.push({ text, lang, at: Date.now() });
       pumpTts();
     },
     [voiceOn, pumpTts],
   );
+  useEffect(() => {
+    const active = isVoiceSessionActive(bridge.status);
+    voiceSessionActive.current = active;
+    if (active) ttsCancel(); // 一開始連線，就把還在講、排隊中的本機聲音全部停掉
+  }, [bridge.status, ttsCancel]);
+  // 一開頁就先向瀏覽器要聲音清單（Chrome 是晚一點才載入的），載入後把等待中的句子講出來。
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const synth = window.speechSynthesis;
+    const load = () => {
+      ttsVoices.current = synth.getVoices();
+      pumpTts();
+    };
+    load();
+    synth.addEventListener("voiceschanged", load);
+    return () => synth.removeEventListener("voiceschanged", load);
+  }, [pumpTts]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -816,7 +832,8 @@ export default function Home() {
 
   // 🎙️ 免接觸「嘿宇宙」/「宇宙」喚醒監聽（現場黑手免觸摸螢幕，Siri 級無感體驗）
   useWakeWordListener({
-    enabled: wakeEnabled && !mvListening,
+    // AI 講話時先不聽：AI 開場會說 "Universe AI is now online"，喚醒詞裡有 universe，以前會被 AI 自己觸發
+    enabled: wakeEnabled && !mvListening && bridge.status !== "speaking",
     onWake: () => {
       ttsCancel();
       openDialog();

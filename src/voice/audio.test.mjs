@@ -133,6 +133,22 @@ describe("voice/audio gapless playback queue", () => {
     q.enqueue(chunk40ms());
     assert.ok(close(sources[3].startedAt, 2.0 + PLAYBACK_START_LEAD_S));
   });
+
+  it("10b. isPlaying stays true until the last chunk has actually ended (總管 2026-09-27)", () => {
+    const { ctx, sources } = fakeAudioContext(0);
+    const q = createPlaybackQueue(ctx, () => {});
+    assert.equal(q.isPlaying(), false);
+    q.enqueue(chunk40ms());
+    q.enqueue(chunk40ms());
+    assert.equal(q.isPlaying(), true);
+    sources[0].onended();
+    assert.equal(q.isPlaying(), true);
+    sources[1].onended();
+    assert.equal(q.isPlaying(), false);
+    q.enqueue(chunk40ms());
+    q.stopAndClear();
+    assert.equal(q.isPlaying(), false);
+  });
 });
 
 // reply.audio field (總管 2026-09-25): the official API puts the audio in `data`;
