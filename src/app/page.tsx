@@ -1240,6 +1240,27 @@ export default function Home() {
         </div>
       )}
 
+      {/* 連上後告訴評審可以講什麼（大銘 2026-09-28 選：評審從 lablab 點進來不一定看過說明） */}
+      {(bridge.status === "listening" || bridge.status === "thinking" || bridge.status === "speaking") && (
+        <div
+          data-testid="voice-hint-banner"
+          className="bg-sky-50 border-b border-sky-300 px-4 py-1.5 text-xs text-sky-900 flex flex-wrap items-center gap-x-3 gap-y-1"
+        >
+          <span className="font-bold">
+            🎙 {langMode === "en" ? "Try saying:" : "可以這樣說（英文或中文都可以）："}
+          </span>
+          <span className="font-mono">&quot;Machine three has an alarm.&quot;</span>
+          <span className="font-mono">&quot;Please open a repair ticket.&quot; → &quot;Yes.&quot;</span>
+          <span className="font-mono">&quot;Show the robot arm.&quot;</span>
+          <span className="font-mono">&quot;That&apos;s all, thank you.&quot;</span>
+          <span className="text-sky-700">
+            {langMode === "en"
+              ? "· Or press a shortcut on the right: the AI reads the answer."
+              : "· 也可以按右邊的捷徑，AI 會唸出回答。"}
+          </span>
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col lg:flex-row p-4 gap-4 max-w-[1720px] w-full mx-auto">
         <main className="flex-1 space-y-4">
           {/* ============ F1 流程監控總覽（放大五站 + 警報才出現的面板） ============ */}

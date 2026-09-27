@@ -6,7 +6,8 @@ function buildSessionUpdate(systemPrompt: string, tools: object[]) {
     type: "session.update",
     session: {
       system_prompt: systemPrompt,
-      greeting: "Universe AI is now online and listening.",
+      // 開場白順便教評審怎麼開始（大銘 2026-09-28 選）
+      greeting: "Universe AI is online. Try saying: machine three has an alarm.",
       tools,
       input: {
         voice_focus: "far-field",
