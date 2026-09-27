@@ -618,14 +618,21 @@ export default function Home() {
   // 語音連線（AssemblyAI 或本機 mock）進行中：本機助理只顯示文字、不出聲，只留 AI 一個聲音。
   // 以前本機聲音從喇叭出來又被麥克風收進去，AI 以為有人講話也跟著回＝「兩個聲音一起出來」
   //（大銘 2026-09-27 回報並選「只留 AI 一個聲音」）。
+  // 連線中按按鈕／打字（fromClick）的回答，改請官方 AI 用它自己的聲音唸（大銘 2026-09-27 選
+  // 「按鈕的回答改由官方 AI 唸」）；語音喚醒不送，因為 AssemblyAI 自己就聽得到操作員講的話。
   const voiceSessionActive = useRef(false);
+  const agentSay = bridge.agentSay;
   const speak = useCallback(
-    (text: string, lang: "zh" | "en" = "zh") => {
-      if (!voiceOn || voiceSessionActive.current || typeof window === "undefined" || !window.speechSynthesis) return;
+    (text: string, lang: "zh" | "en" = "zh", fromClick = false) => {
+      if (voiceSessionActive.current) {
+        if (fromClick && voiceOn) agentSay(text);
+        return;
+      }
+      if (!voiceOn || typeof window === "undefined" || !window.speechSynthesis) return;
       ttsQueue.current.push({ text, lang, at: Date.now() });
       pumpTts();
     },
-    [voiceOn, pumpTts],
+    [voiceOn, pumpTts, agentSay],
   );
   useEffect(() => {
     const active = isVoiceSessionActive(bridge.status);
@@ -710,7 +717,7 @@ export default function Home() {
 
       setSupplierMsg(msg);
       setMvReply(msg);
-      speak(msg, langMode);
+      speak(msg, langMode, true);
       openDialog();
 
       // 2. 接通交談完成，切換狀態並寫入 F5 通話日誌
@@ -755,7 +762,7 @@ export default function Home() {
       ? "Alarm cleared. Machining Station 04 returned to normal, alert panel closed."
       : "警報已解除，04 加工區恢復正常，警報面板已收回。";
     setMvReply(msg);
-    speak(msg, langMode);
+    speak(msg, langMode, true);
     openDialog();
     if (bridge.status === "listening" || bridge.status === "speaking" || bridge.status === "thinking") {
       bridge.sendSay("clear machine alarm");
@@ -763,7 +770,7 @@ export default function Home() {
   }, [langMode, speak, openDialog, bridge, heartbeat]);
 
   const runModelCommand = useCallback(
-    (text: string) => {
+    (text: string, fromClick = false) => {
       const t = text.trim();
       if (!t) return;
       // 看板即時狀態傳進 interpret：支援中英雙語
@@ -778,7 +785,7 @@ export default function Home() {
       setMvReply(res.response);
       // 稿件實際語系配對應聲音：含中文字→中文聲，其餘→英文聲。
       // 舊分支在英文模式下仍可能回中文（commands.ts 開頭註明），不靠 langMode 猜。
-      speak(res.response, /[一-鿿]/.test(res.response) ? "zh" : "en");
+      speak(res.response, /[一-鿿]/.test(res.response) ? "zh" : "en", fromClick);
       if (res.clearAlarm) {
         setIsAlarm(false); // 跟按鈕/F8 同一個效果
         heartbeat.injectFault("none");
@@ -816,12 +823,12 @@ export default function Home() {
   }, [bridge, passcode, openDialog]);
 
   const sendQuick = useCallback(
-    (txt: string) => {
+    (txt: string, fromClick = true) => {
       const line = txt.trim();
       if (!line) return;
       openDialog();
-      // 1. 本地 CNC-640 控制台介面立即執行因應對的事件
-      runModelCommand(line);
+      // 1. 本地 CNC-640 控制台介面立即執行因應對的事件（按鈕／打字＝fromClick，語音喚醒＝false）
+      runModelCommand(line, fromClick);
       // 2. 若語音 Bridge 在線，同步送出文字給 AssemblyAI / Mock-Agent
       if (bridge.status === "listening" || bridge.status === "speaking" || bridge.status === "thinking") {
         bridge.sendSay(line);
@@ -844,7 +851,7 @@ export default function Home() {
     onCommand: (cmd) => {
       ttsCancel();
       openDialog();
-      sendQuick(cmd);
+      sendQuick(cmd, false);
     },
   });
 

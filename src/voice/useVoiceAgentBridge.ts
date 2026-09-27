@@ -27,6 +27,7 @@ import {
   type IncomingMessage,
 } from "./client";
 import { createConfirmGate } from "./confirmGate";
+import { createAgentSayQueue, type AgentSayQueue } from "./ttsVoice";
 
 export type AgentStatus =
   | "idle"
@@ -74,6 +75,18 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
   const liveRef = useRef(false);
   // 開單、清警報前，程式自己確認操作員剛剛真的說了 yes（不只靠 AI 自律，見 confirmGate.ts）
   const confirmGate = useRef(createConfirmGate());
+  // 連線時按按鈕：請官方 AI 用它的聲音唸出主控台的回答（reply.create；AI 在講話時先排隊，見 ttsVoice.ts）
+  const agentSayQueue = useRef<AgentSayQueue | null>(null);
+  const agentQueue = useCallback((): AgentSayQueue => {
+    if (!agentSayQueue.current) {
+      agentSayQueue.current = createAgentSayQueue((m) => {
+        if (!liveRef.current || !ws.current || ws.current.readyState !== WebSocket.OPEN) return false;
+        ws.current.send(JSON.stringify(m));
+        return true;
+      });
+    }
+    return agentSayQueue.current;
+  }, []);
 
   // Audio capture and playback
   const audioCtx = useRef<AudioContext | null>(null);
@@ -155,6 +168,7 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
     stopTimer();
     liveRef.current = false;
     confirmGate.current.reset();
+    agentQueue().reset();
     setStatus("idle");
     setSeconds(0);
     setSessionId("");
@@ -162,7 +176,10 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
     setChat([]);
     setLastAgentSay("");
     setLastUserSay("");
-  }, [closeSocket, stopAudio, stopTimer]);
+  }, [closeSocket, stopAudio, stopTimer, agentQueue]);
+
+  // 請官方 AI 唸一句主控台的回答；回傳 false＝沒有真連線（mock 或沒連上）
+  const agentSay = useCallback((text: string) => agentQueue().say(text), [agentQueue]);
 
   const sendSay = useCallback((text: string) => {
     const line = text.trim();
@@ -183,6 +200,10 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
       } catch {
         return;
       }
+
+      // AI 回話開始／結束：給「按按鈕請 AI 唸」排隊用（被打斷的 reply.done 也算結束）
+      if (msg.type === "reply.started") agentQueue().onReplyStarted();
+      if (msg.type === "reply.done") agentQueue().onReplyDone();
 
       if (isInterruptionMessage(msg)) {
         playback.current?.stopAndClear();
@@ -328,7 +349,7 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
         setStatus("error");
       }
     },
-    [endCall, stopAudio, stopTimer],
+    [endCall, stopAudio, stopTimer, agentQueue],
   );
 
   const startCall = useCallback(
@@ -455,5 +476,6 @@ export function useVoiceAgentBridge(options: VoiceAgentBridgeOptions = {}) {
     endCall,
     reset,
     sendSay,
+    agentSay,
   };
 }
