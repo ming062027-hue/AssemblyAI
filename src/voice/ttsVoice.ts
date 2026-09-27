@@ -50,15 +50,23 @@ export function isVoiceSessionActive(status: string): boolean {
 // 大銘 2026-09-27：連線後按按鈕沒聲音（本機不出聲、按鈕也沒送給 AI），選「按鈕的回答改由官方 AI 唸」。
 // 用官方 reply.create（events-reference：可附一次性 instructions，不改 system_prompt）。
 
-/** 組 reply.create：只唸主控台給的內容，不加料、不為這句呼叫工具（免得按按鈕讓 AI 自己去開單）。 */
+/**
+ * 組 reply.create：只唸主控台給的內容，不加料、不為這句呼叫工具（免得按按鈕讓 AI 自己去開單）。
+ * 2026-09-27 真連線實測：舊說法「一兩句話講重點」讓 AI 自己加了原文沒有的「machine M01」，
+ * 所以改成「可以省略句子、不准改寫或加東西」，並先拿掉 [Alert Push] 這類標籤。
+ */
 export function buildAgentSayMessage(consoleText: string): { type: "reply.create"; instructions: string } {
-  const text = consoleText.replace(/\s+/g, " ").trim().slice(0, 600);
+  const text = consoleText
+    .replace(/\[[^\]]{1,40}\]\s*/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 600);
   return {
     type: "reply.create",
     instructions:
-      "The operator just pressed a shortcut on the CNC-640 console. Treat the console answer below as a tool result. " +
-      "Tell the operator what it says, in English, in one or two short sentences. " +
-      "Do not add any fact, number or ticket ID that is not in it, and do not call any tool for this reply. " +
+      "The operator just pressed a shortcut on the CNC-640 console. Read the console answer below to the operator in English. " +
+      "You may leave out sentences to keep it to about three sentences, but do not reword its facts and never add anything that is not in it: " +
+      "no machine ID, number, ticket ID or cause that the console answer does not contain. Do not call any tool for this reply. " +
       `Console answer: "${text}"`,
   };
 }

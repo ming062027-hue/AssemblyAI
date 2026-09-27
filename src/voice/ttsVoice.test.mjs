@@ -68,9 +68,13 @@ describe("buildAgentSayMessage", () => {
     const m = buildAgentSayMessage("  Alarm 414: spindle load abnormal.\n First check the tool edge. ");
     assert.equal(m.type, "reply.create");
     assert.match(m.instructions, /Console answer: "Alarm 414: spindle load abnormal\. First check the tool edge\."$/);
-    assert.match(m.instructions, /Do not add any fact, number or ticket ID/);
-    assert.match(m.instructions, /do not call any tool/);
+    assert.match(m.instructions, /never add anything that is not in it: no machine ID, number, ticket ID or cause/);
+    assert.match(m.instructions, /Do not call any tool/);
     assert.deepEqual(Object.keys(m).sort(), ["instructions", "type"]);
+  });
+  it("drops bracket tags like [Alert Push] so the AI does not read them out", () => {
+    const m = buildAgentSayMessage("[Alert Push] Alarm 414: Spindle load abnormal (demo). [P1 Warning] Running with caution.");
+    assert.match(m.instructions, /Console answer: "Alarm 414: Spindle load abnormal \(demo\)\. Running with caution\."$/);
   });
   it("caps very long console answers", () => {
     assert.ok(buildAgentSayMessage("x".repeat(5000)).instructions.length < 1000);
